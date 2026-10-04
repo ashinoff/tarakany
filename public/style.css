@@ -368,7 +368,8 @@ p { margin: 0; }
 .text-box.waiting { color: #8b9993; }
 .text-box.spectator { color: #8b9993; }
 
-.t-done { color: var(--done); }
+.t-done { color: #aab4ad; } /* уже набранное - светлое, не мешает */
+.t-rest { color: #0d100e; font-weight: 500; } /* ещё не набранное - тёмное, хорошо видно */
 /* обычный курсор: синий фон, белый текст - хорошо виден */
 .t-cur {
   background: #2f6df6;
@@ -561,11 +562,17 @@ p { margin: 0; }
   .room-label { font-size: 13px; min-width: 0; }
   .race-stage { margin-top: 6px; }
   /* на телефоне текст сразу под трассой, табло ниже */
-  .race-panel { flex-direction: column; gap: 10px; padding: 0 10px; margin-top: 10px; min-height: 0; }
+  .race-panel { flex-direction: column; gap: 10px; padding: 0 10px calc(14px + env(safe-area-inset-bottom, 0px)); margin-top: 10px; min-height: 0; }
   .center-main { order: -1; }
   .standings { width: auto; flex: none; max-height: 190px; }
-  /* окно текста в 3 строки - над клавиатурой влезает вместе с трассой; прокручивается за курсором */
-  #typing .text-box:not(.placeholder) { flex: none; height: calc(1.7em * 3 + 32px); scroll-behavior: smooth; }
+  /* окно текста в 3 строки; текущая строка держится у верха, палец его не прокручивает (scrollTop ведём из JS) */
+  #typing .text-box:not(.placeholder) {
+    flex: none;
+    height: calc(1.7em * 3 + 28px);
+    scroll-behavior: smooth;
+    touch-action: none;
+    overscroll-behavior: contain;
+  }
   .quip { font-size: 14px; padding-top: 8px; }
   .room-label { flex-basis: 100%; order: 5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .standings-list { font-size: 13px; }

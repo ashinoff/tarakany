@@ -1251,14 +1251,14 @@
       const footY = L.standH - 5 * s;
       const edge = 10 * s;
 
-      // --- чирлидерши над стартом ---
-      const cheerN = 8;
-      const cheerGap = (L.narrow ? 20 : 25) * s;
+      // --- чирлидерши над стартом (на телефоне их нет - вместо них обычные болельщики) ---
+      const cheerN = L.narrow ? 0 : 8;
+      const cheerGap = 25 * s;
       const cheerX0 = Math.max(edge + 14 * s, L.startX - 4 * cheerGap - 30 * s);
       for (let i = 0; i < cheerN; i++) {
         figs.push({ kind: 'cheer', i, x: cheerX0 + i * cheerGap, y: footY, s: s * 0.97, depth: 0, pal: BODY_TONES[0], acc: CHEER, ph: i * 1.37, blinkPeriod: 3.1 + (i % 3) * 0.8 });
       }
-      const cheerX1 = cheerX0 + cheerGap * (cheerN - 1);
+      const cheerX1 = cheerN ? cheerX0 + cheerGap * (cheerN - 1) : edge;
 
       // --- пресса над финишем: операторы, корреспондент, фотограф ---
       const pressKinds = L.narrow ? ['tv', 'photo'] : ['tv', 'mic', 'tv', 'photo'];

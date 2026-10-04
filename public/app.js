@@ -481,13 +481,14 @@
     keepCursorVisible(box);
   }
 
-  // длинный текст в невысоком окне (телефон) сам прокручивается за курсором
+  // В невысоком окне (телефон) держим текущую строку у верхнего края:
+  // как только дописал строку, текст сам поднимается, и печатаешь всегда вверху -
+  // ничего не закрывает адресная строка браузера, и палец не нужен.
   function keepCursorVisible(box) {
-    const curEl = box.querySelector('.t-cur');
+    const curEl = box.querySelector('.t-cur') || box.querySelector('.t-rest');
     if (!curEl || box.scrollHeight <= box.clientHeight + 2) return;
-    const line = curEl.offsetHeight || 30;
-    const y = curEl.offsetTop - box.scrollTop;
-    if (y > box.clientHeight - line * 1.8 || y < line * 0.2) box.scrollTop = Math.max(0, curEl.offsetTop - line * 1.1);
+    const padTop = parseFloat(getComputedStyle(box).paddingTop) || 0;
+    box.scrollTop = Math.max(0, curEl.offsetTop - padTop);
   }
 
   function shake() {
