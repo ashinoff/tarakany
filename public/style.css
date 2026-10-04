@@ -252,33 +252,29 @@ p { margin: 0; }
   min-height: 1.4em;
 }
 
-/* ---------- Кольцевой стадион ---------- */
+/* ---------- Трасса во всю ширину экрана ---------- */
 .race-stage {
   position: relative;
-  margin: 10px 10px 4px;
-  /* трибуны сверху и снизу стали высокими - отдаём им высоту, поле в центре не ужимаем */
-  height: clamp(620px, calc(100vh - 112px), 1040px);
-  border: 3px solid var(--wall-deep);
-  border-radius: var(--radius);
+  margin: 8px 0 0;
+  border-top: 3px solid var(--wall-deep);
+  border-bottom: 3px solid var(--wall-deep);
   overflow: hidden;
-  box-shadow: var(--plate-shadow);
-  background: #e4dccb;
+  background: #e7e2d4;
 }
+/* высоту холста выставляет track.js: трибуна + дорожки */
 #track {
-  position: absolute;
-  inset: 0;
   display: block;
   width: 100%;
-  height: 100%;
 }
 
-/* то, что стоит в "поле" внутри кольца; inset выставляет track.js по геометрии трассы */
-.ring-inner {
-  position: absolute;
-  inset: 140px;
+/* под трассой: табло слева, текст справа; занимает остаток экрана */
+.race-panel {
   display: flex;
   gap: 16px;
-  min-height: 0;
+  max-width: 1400px;
+  margin: 14px auto 0;
+  padding: 0 16px;
+  min-height: max(260px, calc(100vh - var(--stage-h, 460px) - 150px));
 }
 
 /* табло мест слева */
@@ -400,6 +396,12 @@ p { margin: 0; }
   color: var(--ink);
 }
 
+/* на телефоне подсказка про клавиатуру */
+@media (hover: none) {
+  .typing:not(:has(.text-box.focused)) .text-box:not(.placeholder):not(.spectator)::after {
+    content: "Нажми сюда, чтобы открыть клавиатуру";
+  }
+}
 .text-box.shake { animation: shake 0.18s linear; }
 @keyframes shake {
   25% { transform: translateX(-3px); }
@@ -557,9 +559,15 @@ p { margin: 0; }
   .wrap { padding: 0 14px; }
   .brand-sub { display: none; }
   .room-label { font-size: 13px; min-width: 0; }
-  .race-stage { height: clamp(600px, calc(80vh + 70px), 980px); margin: 8px 6px 4px; }
-  .ring-inner { flex-direction: column; gap: 10px; }
-  .standings { width: auto; flex: none; max-height: 34%; }
+  .race-stage { margin-top: 6px; }
+  /* на телефоне текст сразу под трассой, табло ниже */
+  .race-panel { flex-direction: column; gap: 10px; padding: 0 10px; margin-top: 10px; min-height: 0; }
+  .center-main { order: -1; }
+  .standings { width: auto; flex: none; max-height: 190px; }
+  /* окно текста в 3 строки - над клавиатурой влезает вместе с трассой; прокручивается за курсором */
+  #typing .text-box:not(.placeholder) { flex: none; height: calc(1.7em * 3 + 32px); scroll-behavior: smooth; }
+  .quip { font-size: 14px; padding-top: 8px; }
+  .room-label { flex-basis: 100%; order: 5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .standings-list { font-size: 13px; }
   .my-stats .stat b { font-size: 17px; }
   .text-box { font-size: 18px; padding: 14px 16px; }

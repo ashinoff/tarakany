@@ -1,4 +1,4 @@
-/* Трасса тараканьих бегов: кольцевой стадион с трибунами, всё рисуем на canvas, без картинок. */
+/* Трасса тараканьих бегов: длинная прямая во всю ширину, трибуна сверху. Всё рисуем на canvas, без картинок. */
 (function () {
   'use strict';
 
@@ -1121,7 +1121,9 @@
     return pose;
   }
 
-  // ---------- Трасса (кольцо) ----------
+  // =====================================================================
+  // ТРАССА: длинная прямая во всю ширину экрана, сверху одна большая трибуна
+  // =====================================================================
   class Track {
     constructor(canvas) {
       this.canvas = canvas;
@@ -1134,18 +1136,18 @@
       this.cssH = 0;
       this.dpr = 1;
       this.tilePattern = null;
-      this.loops = [];
-      this.boundInsets = [];
-      this.ring = null; // HTML-панель в центре кольца; её inset выставляем по геометрии
+      this.ring = null; // совместимость со старым кодом (раньше тут была панель внутри кольца)
       this.phase = 'waiting';
       this.boost = 0;
-      this.crowd = { figs: [], clusters: [], banners: [], press: null };
+      this.crowd = { figs: [], clusters: [], banners: [], press: null, spots: [] };
       this.flashes = [];
       this.confetti = [];
       this.leader = null;
       this.last = performance.now();
       this.resize(true);
       window.addEventListener('resize', () => this.resize(true));
+      // клавиатура телефона открылась/закрылась - пересчитываем высоту трибуны и дорожек
+      if (window.visualViewport) window.visualViewport.addEventListener('resize', () => this.resize(false));
       // шрифты подгрузились - перемеряем ширину транспарантов
       if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => this.buildCrowd());
       requestAnimationFrame((t) => this.frame(t));
@@ -1155,137 +1157,69 @@
       return this.cssW < 560;
     }
 
+    // Высоту сцены считаем от высоты окна: трибуна + дорожки, а под ними должен влезть текст
     layout() {
       const W = this.cssW;
-      const H = this.cssH;
       const narrow = this.narrow;
-      const side = narrow ? 8 : 14; // боковые стенки
-      // трибуны сверху и снизу: на высоком экране выше и тараканы крупнее,
-      // на низком ноутбуке скромнее, чтобы не съесть место под текст
-      const standH = narrow ? 56 : Math.round(Math.min(104, Math.max(66, H * 0.115)));
-      const standTop = standH;
-      const standBottom = standH;
-      const ox = side;
-      const oy = standTop;
-      const ow = W - 2 * side;
-      const oh = Math.max(160, H - standTop - standBottom);
       const lanes = Math.max(3, this.order.length);
-      const minSide = Math.min(ow, oh);
-      const band = narrow
-        ? Math.min(Math.max(48, minSide * 0.17), 92)
-        : Math.min(Math.max(90, minSide * 0.16), 140);
-      const edge = narrow ? 8 : 12; // от края трассы до первой дорожки
-      const laneSpan = Math.max(1, band - edge - 6);
-      const gap = laneSpan / lanes;
-      const corner = narrow ? 22 : 46;
-      const roachScale = narrow ? 0.62 : 1.0;
-      const crowdScale = narrow ? 0.6 : standH / 90;
-      return { W, H, narrow, side, standTop, standBottom, ox, oy, ow, oh, lanes, band, edge, gap, corner, roachScale, crowdScale, cx: W / 2, cy: oy + oh / 2 };
-    }
-
-    // Замкнутая дорожка - скруглённый прямоугольник на расстоянии d от внешнего края трассы.
-    // at(f) по доле пути [0..1) даёт точку и угол направления движения (ПО ЧАСОВОЙ,
-    // старт в середине ВЕРХНЕЙ стороны, таракан сперва бежит вправо).
-    makeLoop(d, L) {
-      const x = L.ox + d;
-      const y = L.oy + d;
-      const w = L.ow - 2 * d;
-      const h = L.oh - 2 * d;
-      const r = Math.max(6, Math.min(L.corner, Math.min(w, h) / 2 - 2));
-      const segs = [];
-      const straight = (ax, ay, bx, by) => {
-        const dx = bx - ax;
-        const dy = by - ay;
-        const len = Math.hypot(dx, dy) || 0.0001;
-        segs.push({ len, pt: (dd) => ({ x: ax + dx * (dd / len), y: ay + dy * (dd / len) }) });
-      };
-      const arc = (cx, cy, a0, a1) => {
-        const len = Math.abs(a1 - a0) * r || 0.0001;
-        segs.push({
-          len,
-          pt: (dd) => {
-            const a = a0 + (a1 - a0) * (dd / len);
-            return { x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r };
-          },
-        });
-      };
-      straight(x + r, y, x + w - r, y); // верх, вправо
-      arc(x + w - r, y + r, -Math.PI / 2, 0);
-      straight(x + w, y + r, x + w, y + h - r); // право, вниз
-      arc(x + w - r, y + h - r, 0, Math.PI / 2);
-      straight(x + w - r, y + h, x + r, y + h); // низ, влево
-      arc(x + r, y + h - r, Math.PI / 2, Math.PI);
-      straight(x, y + h - r, x, y + r); // лево, вверх
-      arc(x + r, y + r, Math.PI, 1.5 * Math.PI);
-
-      const total = segs.reduce((sum, g) => sum + g.len, 0) || 1;
-      const startDist = Math.max(0, w / 2 - r); // f = 0 в середине верхней стороны
-      const raw = (dist) => {
-        let dd = ((dist % total) + total) % total;
-        for (const g of segs) {
-          if (dd <= g.len) return g.pt(dd);
-          dd -= g.len;
-        }
-        const last = segs[segs.length - 1];
-        return last.pt(last.len);
-      };
+      const vh = window.innerHeight || 800;
+      // на телефоне с открытой клавиатурой считаем по видимой части экрана:
+      // трасса + три строки текста должны влезть над клавиатурой
+      const vv = window.visualViewport;
+      const kbOpen = narrow && vv && vv.height < vh * 0.8;
+      const budget = kbOpen
+        ? Math.max(230, vv.height - 175)
+        : Math.max(narrow ? 250 : 300, Math.min(680, vh - (narrow ? 96 : 110) - (narrow ? 330 : 290)));
+      const standMin = narrow ? 86 : 124;
+      const standMax = narrow ? 128 : 220;
+      let laneH = narrow ? (lanes > 5 ? 36 : 44) : lanes > 6 ? 48 : lanes > 4 ? 54 : 60;
+      laneH = Math.max(narrow ? 30 : 36, Math.min(laneH, Math.floor((budget - standMin - 20) / lanes)));
+      const trackH = 10 + lanes * laneH + 10;
+      const standH = Math.round(Math.max(standMin, Math.min(standMax, budget - trackH)));
+      const H = standH + trackH;
+      const roachScale = laneH / 52;
+      const gateW = narrow ? 30 : 140;
+      const bodyL = 46 * roachScale;
+      const startX = gateW + bodyL + 10;
+      const finishX = W - (narrow ? 34 : 56);
       return {
-        len: total,
-        rect: { x, y, w, h, r },
-        at: (f) => {
-          const base = startDist + f * total;
-          const p = raw(base);
-          const p2 = raw(base + 1.4);
-          return { x: p.x, y: p.y, angle: Math.atan2(p2.y - p.y, p2.x - p.x) };
-        },
+        W, H, narrow, lanes, laneH, standH, trackH,
+        laneTop: standH + 10,
+        roachScale, gateW, bodyL, startX, finishX,
+        crowdScale: standH / 94,
+        oy: standH,
       };
-    }
-
-    buildLoops() {
-      const L = (this._L = this.layout());
-      this.loops = [];
-      for (let i = 0; i < L.lanes; i++) this.loops.push(this.makeLoop(L.edge + (i + 0.5) * L.gap, L));
-      this.boundInsets = [];
-      for (let i = 1; i < L.lanes; i++) this.boundInsets.push(L.edge + i * L.gap);
-      if (this.ring) {
-        const m = L.narrow ? 6 : 14;
-        const top = Math.round(L.oy + L.band + m);
-        const bottom = Math.round(L.standBottom + L.band + m);
-        const sides = Math.round(L.side + L.band + m);
-        this.ring.style.inset = `${top}px ${sides}px ${bottom}px ${sides}px`;
-      }
     }
 
     resize(force) {
       const parent = this.canvas.parentElement;
       const w = Math.max(280, Math.floor(parent.clientWidth));
-      const h = Math.max(300, Math.floor(parent.clientHeight));
       const dpr = Math.min(2, window.devicePixelRatio || 1);
-      if (!force && w === this.cssW && h === this.cssH && dpr === this.dpr) return;
       this.cssW = w;
-      this.cssH = h;
+      const L = this.layout();
+      const key = `${w}|${L.H}|${L.standH}|${L.laneH}|${L.lanes}|${dpr}`;
+      this._L = L;
+      if (!force && key === this._key) return;
+      this._key = key;
+      this.cssH = L.H;
       this.dpr = dpr;
+      this._L = L;
+      this.canvas.style.height = L.H + 'px';
       this.canvas.width = Math.round(w * dpr);
-      this.canvas.height = Math.round(h * dpr);
-      this.buildPattern(this.narrow ? 16 : 22);
-      this.buildLoops();
-      this.buildCrowd();
-      // трибуны рисуем в две отдельные полосы и обновляем через кадр - так толпа почти не грузит
-      const L = this._L;
-      if (!this.standTop) {
-        this.standTop = document.createElement('canvas');
-        this.standBot = document.createElement('canvas');
-      }
-      this.standBotY = Math.round((L.oy + L.oh) * dpr);
-      this.standTop.width = this.canvas.width;
-      this.standTop.height = Math.max(1, Math.round(L.oy * dpr));
-      this.standBot.width = this.canvas.width;
-      this.standBot.height = Math.max(1, this.canvas.height - this.standBotY);
+      this.canvas.height = Math.round(L.H * dpr);
+      // CSS узнаёт высоту сцены, чтобы панель с текстом заняла остаток экрана
+      document.documentElement.style.setProperty('--stage-h', L.H + 'px');
+      this.buildPattern(Math.round(L.laneH / 2));
+      // трибуна рисуется в отдельный холст и обновляется через кадр - толпа почти не грузит
+      if (!this.standCanvas) this.standCanvas = document.createElement('canvas');
+      this.standCanvas.width = this.canvas.width;
+      this.standCanvas.height = Math.max(1, Math.round(L.standH * dpr));
       this.crowdFresh = false;
+      this.buildCrowd();
     }
 
     buildPattern(size) {
-      const s = Math.round(size * this.dpr);
+      const s = Math.max(8, Math.round(size * this.dpr));
       const off = document.createElement('canvas');
       off.width = s * 2;
       off.height = s * 2;
@@ -1302,79 +1236,74 @@
       this.tilePattern = this.ctx.createPattern(off, 'repeat');
     }
 
-    // ---------- Расстановка толпы (только при смене размера) ----------
+    // ---------- Расстановка трибуны (только при смене размера) ----------
+    // Слева над стартом - группа поддержки, справа над финишем - пресса,
+    // между ними кучки болельщиков с транспарантами.
     buildCrowd() {
       const L = this.layout();
       const s = L.crowdScale;
-      const rnd = rng(20261004 + Math.round(L.W / 40));
+      const rnd = rng(20261005 + Math.round(L.W / 40));
       const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
       const ctx = this.ctx;
       const figs = [];
       const clusters = [];
       const banners = [];
+      const footY = L.standH - 5 * s;
+      const edge = 10 * s;
 
-      const topY = L.oy - 5 * s;
-      const botY = L.H - 6 * s;
-
-      // чирлидерши по центру верхней трибуны, прямо над стартом-финишем
+      // --- чирлидерши над стартом ---
       const cheerN = 8;
-      const cheerGap = 30 * s;
-      const cheerW = cheerGap * (cheerN - 1);
+      const cheerGap = (L.narrow ? 20 : 25) * s;
+      const cheerX0 = Math.max(edge + 14 * s, L.startX - 4 * cheerGap - 30 * s);
       for (let i = 0; i < cheerN; i++) {
-        figs.push({ kind: 'cheer', side: 'top', i, x: L.cx - cheerW / 2 + i * cheerGap, y: topY, s: s * 0.97, depth: 0, pal: BODY_TONES[0], acc: CHEER, ph: i * 1.37, blinkPeriod: 3.1 + (i % 3) * 0.8 });
+        figs.push({ kind: 'cheer', i, x: cheerX0 + i * cheerGap, y: footY, s: s * 0.97, depth: 0, pal: BODY_TONES[0], acc: CHEER, ph: i * 1.37, blinkPeriod: 3.1 + (i % 3) * 0.8 });
       }
-      // фотографы по краям группы поддержки - снимают финиш
-      const photoOff = cheerW / 2 + 30 * s;
-      for (const side of [-1, 1]) {
-        figs.push({ kind: 'photo', side: 'top', x: L.cx + side * photoOff, y: topY, s, depth: 0, flip: side > 0, pal: BODY_TONES[1], acc: { cam: 'photo', hat: 'beret', hatColor: '#1b1d1f', outfit: 'vest', cloth: '#e2702c' }, ph: rnd() * TAU, nextFlash: 1 + rnd() * 3 });
-      }
+      const cheerX1 = cheerX0 + cheerGap * (cheerN - 1);
 
-      // пресса внизу по центру: операторы, корреспондент с микрофоном, фотограф
-      const pressKinds = L.narrow ? ['tv', 'mic', 'photo'] : ['tv', 'mic', 'photo', 'tv'];
-      const pressGap = 31 * s;
-      const pressW = pressGap * (pressKinds.length - 1);
+      // --- пресса над финишем: операторы, корреспондент, фотограф ---
+      const pressKinds = L.narrow ? ['tv', 'photo'] : ['tv', 'mic', 'tv', 'photo'];
+      const pressGap = 30 * s;
+      const pressX1 = Math.min(L.W - edge - 14 * s, L.finishX);
+      const pressX0 = pressX1 - pressGap * (pressKinds.length - 1);
       pressKinds.forEach((kind, k) => {
         const acc =
           kind === 'tv' ? { cam: 'tv', hat: 'cap', hatColor: '#2f6fde', hatColor2: '#fbfaf5', outfit: 'vest', cloth: '#2f6fde' }
           : kind === 'mic' ? { mic: true, outfit: 'suit', cloth: '#2b3445', cloth2: '#d64532', glasses: 'round' }
           : { cam: 'photo', hat: 'beret', hatColor: '#1b1d1f', outfit: 'vest', cloth: '#e2702c' };
-        figs.push({ kind, side: 'bottom', x: L.cx - pressW / 2 + k * pressGap, y: botY - 2 * s, s, depth: 0, flip: false, pal: BODY_TONES[k % 3], acc, ph: rnd() * TAU, nextFlash: 1 + rnd() * 3 });
+        figs.push({ kind, x: pressX0 + k * pressGap, y: footY - 2 * s, s, depth: 0, flip: false, pal: BODY_TONES[k % 3], acc, ph: rnd() * TAU, nextFlash: 1 + rnd() * 3 });
       });
-      const press = { x: L.cx - pressW / 2 - 16 * s, w: pressW + 32 * s, y: botY - 13 * s, h: 12 * s };
+      const press = { x: pressX0 - 16 * s, w: pressX1 - pressX0 + 32 * s, y: L.standH - 14 * s, h: 12 * s };
 
-      // кучки болельщиков
-      const fill = (x0, x1, y, side, queue, forceFirst) => {
+      // --- кучки болельщиков ---
+      const fill = (x0, x1, queue, forceFirst) => {
         let x = x0 + rnd() * 8 * s;
         let first = true;
         while (true) {
-          let n = L.narrow ? 2 + Math.floor(rnd() * 3) : 3 + Math.floor(rnd() * 4);
+          let n = L.narrow ? 2 + Math.floor(rnd() * 2) : 3 + Math.floor(rnd() * 3);
           let banner = null;
-          if (!L.narrow && queue.length && ((first && forceFirst) || (n >= 4 && rnd() < 0.5))) {
+          if (!L.narrow && queue.length && ((first && forceFirst) || (n >= 4 && rnd() < 0.55))) {
             banner = queue.shift();
             n = Math.max(n, 4);
           }
           const spacing = 14 * s;
           let cw = spacing * (n - 1);
-          let textW = 0;
           if (banner) {
             ctx.font = `800 ${9 * s}px "Unbounded", "Arial Black", sans-serif`;
-            textW = ctx.measureText(banner).width;
-            cw = Math.max(cw, textW - 4 * s);
+            cw = Math.max(cw, ctx.measureText(banner).width - 4 * s);
           }
           if (x + cw + 12 * s > x1) break;
-          const cl = { cx: x + cw / 2, half: cw / 2 + 12 * s, side, hype: 0, jump: 0, team: clusters.length, ph: rnd() * TAU, banner, textW, holders: [] };
+          const cl = { cx: x + cw / 2, half: cw / 2 + 12 * s, hype: 0, jump: 0, team: clusters.length, ph: rnd() * TAU, banner, holders: [] };
           clusters.push(cl);
           for (let k = 0; k < n; k++) {
             const isEnd = k === 0 || k === n - 1;
-            let depth;
-            if (banner) depth = isEnd ? 0 : 1;
-            else depth = (k % 2 === 1) !== (rnd() < 0.2) ? 1 : 0;
+            const depth = banner ? (isEnd ? 0 : 1) : (k % 2 === 1) !== (rnd() < 0.2) ? 1 : 0;
             const fx = banner
               ? (isEnd ? x + (k ? cw : 0) : x + (k / (n - 1)) * cw + (rnd() - 0.5) * 4 * s)
               : x + k * spacing + (rnd() - 0.5) * 4 * s;
             const fs = s * (depth ? 0.86 : 1) * (0.9 + rnd() * 0.16);
             const tone = BODY_TONES[Math.floor(rnd() * BODY_TONES.length)];
-            const dark = depth ? -0.28 : 0;
+            const dark = depth ? -0.22 : 0;
+            const dk = (c) => (dark ? shade(c, dark) : c);
             const hc = pick(HAT_COLORS);
             const outfit = pick(OUTFITS);
             let hat = pick([null, null, 'petushok', 'ushanka', 'cap', 'beret', 'kerchief']);
@@ -1384,14 +1313,12 @@
             let cloth2 = pick(CLOTH);
             if (cloth2 === cloth) cloth2 = '#fbfaf5';
             if (outfit === 'tie' || outfit === 'suit') cloth2 = pick(['#d64532', '#2f6fde', '#e3a512', '#2f9e63']);
-            const dk = (c) => (dark ? shade(c, dark) : c);
             const gl = rnd();
             const fig = {
               kind: 'fan',
-              side,
               cl,
               x: fx,
-              y: depth ? y - 9 * s : y,
+              y: depth ? footY - 9 * s : footY,
               s: fs,
               depth,
               flip: rnd() < 0.5,
@@ -1399,10 +1326,10 @@
               acc: {
                 simple: depth === 1,
                 hat,
-                hatColor: dark ? shade(hc[0], dark) : hc[0],
-                hatColor2: dark ? shade(hc[1], dark) : hc[1],
-                scarf: scarfC ? (dark ? shade(scarfC, dark) : scarfC) : null,
-                scarf2: dark ? shade('#fbfaf5', dark) : '#fbfaf5',
+                hatColor: dk(hc[0]),
+                hatColor2: dk(hc[1]),
+                scarf: scarfC ? dk(scarfC) : null,
+                scarf2: dk('#fbfaf5'),
                 outfit,
                 cloth: dk(cloth),
                 cloth2: dk(cloth2),
@@ -1421,29 +1348,34 @@
               fig.holder = true;
               fig.style = 'holder';
               fig.flip = false;
-              if (fig.acc.hat === 'petushok' || fig.acc.hat === 'ushanka') fig.acc.hat = null; // не протыкать транспарант
+              if (fig.acc.hat === 'petushok' || fig.acc.hat === 'ushanka' || fig.acc.hat === 'kerchief') fig.acc.hat = null;
               cl.holders.push(fig);
             }
             figs.push(fig);
           }
           if (banner) banners.push(cl);
-          x += cw + (L.narrow ? 20 : 40) * s + rnd() * (L.narrow ? 14 : 46) * s;
+          x += cw + (L.narrow ? 18 : 30) * s + rnd() * (L.narrow ? 12 : 34) * s;
           first = false;
         }
       };
 
-      const edgePad = L.side + 4 * s;
-      const qTop = BANNERS_TOP.slice();
-      const qBot = BANNERS_BOTTOM.slice();
-      fill(edgePad, L.cx - photoOff - 22 * s, topY, 'top', qTop, false);
-      fill(L.cx + photoOff + 22 * s, L.W - edgePad, topY, 'top', qTop, false);
-      // «МАМА, Я НА ТВ» встаёт сразу рядом с прессой
-      fill(L.cx + press.w / 2 + 10 * s, L.W - edgePad, botY, 'bottom', qBot, true);
-      fill(edgePad, L.cx - press.w / 2 - 10 * s, botY, 'bottom', qBot, false);
+      const queue = BANNERS_TOP.concat(BANNERS_BOTTOM.slice(1));
+      // «МАМА, Я НА ТВ» встаёт вплотную к прессе
+      if (!L.narrow) {
+        ctx.font = `800 ${9 * s}px "Unbounded", "Arial Black", sans-serif`;
+        const mamaW = Math.max(14 * s * 3, ctx.measureText(BANNERS_BOTTOM[0]).width - 4 * s);
+        const mx1 = press.x - 10 * s;
+        fill(mx1 - mamaW - 34 * s, mx1, [BANNERS_BOTTOM[0]], true);
+        fill(cheerX1 + 34 * s, mx1 - mamaW - 60 * s, queue, false);
+      } else {
+        fill(cheerX1 + 22 * s, press.x - 8 * s, [], false);
+      }
 
       // сначала задний ряд, потом передний
       figs.sort((a, b) => b.depth - a.depth || a.x - b.x);
-      this.crowd = { figs, clusters, banners, press };
+      const spots = [{ x: (cheerX0 + cheerX1) / 2 }, { x: (pressX0 + pressX1) / 2 }];
+      this.crowd = { figs, clusters, banners, press, spots, cheerX0, cheerX1 };
+      this.crowdFresh = false;
     }
 
     // players: [{id, nick, color, progress, place, finished}]
@@ -1460,6 +1392,7 @@
           this.racers.set(p.id, r);
         }
         const wasPlaced = r.place;
+        r.id = p.id;
         r.nick = p.nick;
         r.color = p.color;
         r.lane = i;
@@ -1468,15 +1401,15 @@
         r.finished = p.finished;
         r.dnf = p.dnf;
         if (p.id !== youId || p.progress === 0) r.target = Math.min(1, p.progress / this.textLen);
-        // кто-то финишировал - трибуны взрываются
-        if (!isNew && !wasPlaced && p.place && !p.dnf) this.celebrate(r.place === 1);
+        // кто-то финишировал - трибуна взрывается
+        if (!isNew && !wasPlaced && p.place && !p.dnf) this.celebrate(p.place === 1);
       });
       const changed = this.order.length !== players.length;
       this.order = players.map((p) => p.id);
-      if (changed) this.buildLoops();
+      if (changed) this.resize(false); // число дорожек влияет на высоту сцены
     }
 
-    // состояние заезда влияет на настроение трибун
+    // состояние заезда влияет на настроение трибуны
     setPhase(phase) {
       if (phase === this.phase) return;
       const prev = this.phase;
@@ -1494,23 +1427,28 @@
       this.boost = 1;
       this.flashAll();
       if (reducedMotion) return;
-      for (const f of this.crowd.figs) {
-        if (f.kind !== 'cheer') continue;
-        const n = big ? 9 : 4;
-        for (let k = 0; k < n; k++) {
-          this.confetti.push({
-            x: f.x + (Math.random() - 0.5) * 24 * f.s,
-            y: f.y - 58 * f.s,
-            vx: (Math.random() - 0.5) * 170,
-            vy: -90 - Math.random() * 170,
-            rot: Math.random() * TAU,
-            vr: (Math.random() - 0.5) * 14,
-            life: 2 + Math.random() * 1.2,
-            color: CONFETTI[Math.floor(Math.random() * CONFETTI.length)],
-          });
-        }
+      const L = this._L || this.layout();
+      const s = L.crowdScale;
+      // конфетти летит с трибуны над финишем и от группы поддержки
+      const n = big ? 70 : 30;
+      for (let k = 0; k < n; k++) {
+        const fromCheer = k % 3 === 0 && this.crowd.cheerX0 !== undefined;
+        const x = fromCheer
+          ? this.crowd.cheerX0 + Math.random() * (this.crowd.cheerX1 - this.crowd.cheerX0)
+          : L.finishX - Math.random() * L.W * 0.35;
+        this.confetti.push({
+          x,
+          y: L.standH * (0.25 + Math.random() * 0.4),
+          vx: (Math.random() - 0.5) * 160,
+          vy: -60 - Math.random() * 160,
+          rot: Math.random() * TAU,
+          vr: (Math.random() - 0.5) * 14,
+          life: 2.2 + Math.random() * 1.4,
+          size: s,
+          color: CONFETTI[Math.floor(Math.random() * CONFETTI.length)],
+        });
       }
-      if (this.confetti.length > 220) this.confetti.splice(0, this.confetti.length - 220);
+      if (this.confetti.length > 260) this.confetti.splice(0, this.confetti.length - 260);
     }
 
     flashAll() {
@@ -1537,71 +1475,64 @@
       }
     }
 
+    racerPos(r, L) {
+      return {
+        x: L.startX - L.bodyL / 2 + r.x * (L.finishX - L.startX),
+        y: L.laneTop + (r.lane + 0.5) * L.laneH,
+      };
+    }
+
     frame(t) {
       const dt = Math.min(0.05, (t - this.last) / 1000);
       this.last = t;
       this.clock = (this.clock || 0) + dt;
+      const L = this._L || this.layout();
+      const runPx = L.finishX - L.startX;
 
       let leader = null;
       for (const r of this.racers.values()) {
-        const loop = this.loops[r.lane] || this.loops[0];
         const prev = r.x;
         r.x += (r.target - r.x) * Math.min(1, dt * 7);
         if (Math.abs(r.target - r.x) < 0.0004) r.x = r.target;
-        const movedPx = Math.abs(r.x - prev) * (loop ? loop.len : 600);
+        const movedPx = Math.abs(r.x - prev) * runPx;
         r.moving = r.moving * 0.85 + Math.min(1, movedPx / (dt * 60 || 1)) * 0.15;
         r.phase += movedPx * 0.45;
         r.twitch += dt * (2 + r.moving * 10);
-        if (loop) {
-          const a = loop.at(r.x);
-          r.px = a.x;
-          r.py = a.y;
-        }
+        const p = this.racerPos(r, L);
+        r.px = p.x;
+        r.py = p.y;
         if (!leader || r.x > leader.x) leader = r;
 
-        if (!reducedMotion && loop) {
+        if (!reducedMotion) {
           if (movedPx > 0.4 && Math.random() < 0.6) {
-            const a = loop.at(r.x);
-            r.dust.push({
-              x: a.x - Math.cos(a.angle) * 16,
-              y: a.y - Math.sin(a.angle) * 16,
-              life: 1,
-              vx: (Math.random() - 0.5) * 26,
-              vy: (Math.random() - 0.5) * 26,
-            });
+            r.dust.push({ x: p.x - 20 * L.roachScale, y: p.y + (Math.random() - 0.5) * 14 * L.roachScale, life: 1, vx: -20 - Math.random() * 30 });
             if (r.dust.length > 24) r.dust.shift();
           }
           for (const d of r.dust) {
             d.life -= dt * 2.2;
             d.x += d.vx * dt;
-            d.y += d.vy * dt;
           }
           r.dust = r.dust.filter((d) => d.life > 0);
         }
       }
       this.leader = leader;
-      this.updateCrowd(dt);
-      this.draw();
+      this.updateCrowd(dt, L);
+      this.draw(L);
       requestAnimationFrame((tt) => this.frame(tt));
     }
 
-    // кто рядом пробегает - та кучка и сходит с ума
-    updateCrowd(dt) {
-      const L = this._L || this.layout();
+    // кто пробегает мимо кучки - та и сходит с ума, волна идёт за лидером
+    updateCrowd(dt, L) {
       const t = this.clock || 0;
       this.boost = Math.max(0, this.boost - dt * 0.35);
       const racing = this.phase === 'racing' || this.phase === 'countdown';
-      const topZone = L.oy + L.band + 10;
-      const botZone = L.oy + L.oh - L.band - 10;
-      const leaderId = this.leader && this.leader.x > 0 ? [...this.racers.entries()].find(([, r]) => r === this.leader)[0] : null;
+      const leaderId = this.leader && this.leader.x > 0 ? this.leader.id : null;
 
       for (const c of this.crowd.clusters) {
         let target = this.boost * 0.8;
         if (racing) {
           for (const r of this.racers.values()) {
-            if (r.px === undefined) continue;
-            const onSide = c.side === 'top' ? r.py < topZone : r.py > botZone;
-            if (onSide && Math.abs(r.px - c.cx) < c.half + 70) target = 1;
+            if (r.px !== undefined && r.x > 0 && Math.abs(r.px - c.cx) < c.half + 90) target = 1;
           }
           const teamId = this.order.length ? this.order[c.team % this.order.length] : null;
           if (teamId && teamId === leaderId) target = Math.max(target, 0.3);
@@ -1625,7 +1556,7 @@
       this.flashes = this.flashes.filter((fl) => fl.life > 0);
 
       for (const p of this.confetti) {
-        p.vy += 260 * dt;
+        p.vy += 240 * dt;
         p.vx *= 1 - dt * 0.6;
         p.x += p.vx * dt + Math.sin(t * 6 + p.rot) * 0.4;
         p.y += p.vy * dt;
@@ -1635,112 +1566,124 @@
       this.confetti = this.confetti.filter((p) => p.life > 0 && p.y < L.H + 10);
     }
 
-    draw() {
-      const L = this._L || this.layout();
-      this._L = L;
+    draw(L) {
       const ctx = this.ctx;
       const W = L.W;
-      const H = L.H;
       const t = this.clock || 0;
 
-      // толпу перерисовываем «через кадр», а если устройство слабое - реже
+      // --- трибуна: из кэша, перерисовываем через кадр (на слабых устройствах реже) ---
       this.crowdTick = (this.crowdTick || 0) + 1;
       const every = (this.crowdCost || 0) > 6 ? 3 : 2;
       if (!this.crowdFresh || this.crowdTick % every === 0) {
         const t0 = performance.now();
-        const ct = this.standTop.getContext('2d');
-        ct.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-        this.drawStands(L, ct);
-        this.drawCrowd(L, reducedMotion ? 0 : t, ct, 'top');
-        const cb = this.standBot.getContext('2d');
-        cb.setTransform(this.dpr, 0, 0, this.dpr, 0, -this.standBotY);
-        this.drawStands(L, cb);
-        this.drawCrowd(L, reducedMotion ? 0 : t, cb, 'bottom');
+        const cc = this.standCanvas.getContext('2d');
+        cc.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+        this.drawStands(L, cc);
+        this.drawCrowd(L, reducedMotion ? 0 : t, cc);
         this.crowdFresh = true;
         this.crowdCost = (this.crowdCost || 0) * 0.9 + (performance.now() - t0) * 0.1;
       }
-      ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-      ctx.fillStyle = PAL.stands;
-      ctx.fillRect(0, L.oy, W, L.oh);
       ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.drawImage(this.standTop, 0, 0);
-      ctx.drawImage(this.standBot, 0, this.standBotY);
+      ctx.drawImage(this.standCanvas, 0, 0);
+      // покрытие трассы (плитка)
+      ctx.fillStyle = this.tilePattern || PAL.tileA;
+      const ty = Math.round(L.standH * this.dpr);
+      ctx.fillRect(0, ty, this.canvas.width, this.canvas.height - ty);
       ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
 
-      // всё ниже рисуем внутри внешнего скругления трассы
-      ctx.save();
-      this.roundRect(ctx, L.ox, L.oy, L.ow, L.oh, L.corner + 6);
-      ctx.clip();
+      const lanesH = L.lanes * L.laneH;
 
-      ctx.fillStyle = this.tilePattern || PAL.tileA;
-      ctx.fillRect(L.ox, L.oy, L.ow, L.oh);
-
-      // подсветка твоей дорожки
+      // подсветка своей дорожки
       const you = this.racers.get(this.youId);
-      if (you && this.loops[you.lane]) {
-        const rc = this.loops[you.lane].rect;
-        this.roundRect(ctx, rc.x, rc.y, rc.w, rc.h, rc.r);
-        ctx.strokeStyle = PAL.you;
-        ctx.lineWidth = Math.max(6, L.gap * 0.82);
-        ctx.stroke();
+      if (you) {
+        ctx.fillStyle = PAL.you;
+        ctx.fillRect(0, L.laneTop + you.lane * L.laneH, W, L.laneH);
       }
 
       // разделители дорожек
       ctx.strokeStyle = 'rgba(33, 68, 55, 0.35)';
       ctx.lineWidth = 1.5;
-      ctx.setLineDash([11, 9]);
-      for (const d of this.boundInsets) {
-        this.roundRect(ctx, L.ox + d, L.oy + d, L.ow - 2 * d, L.oh - 2 * d, Math.max(6, L.corner - (d - L.edge)));
-        ctx.stroke();
+      ctx.setLineDash([12, 9]);
+      ctx.beginPath();
+      for (let i = 0; i <= L.lanes; i++) {
+        const y = L.laneTop + i * L.laneH + 0.5;
+        ctx.moveTo(L.gateW, y);
+        ctx.lineTo(W, y);
       }
+      ctx.stroke();
       ctx.setLineDash([]);
 
-      // поле внутри кольца (сюда ложится панель со счётом и текстом)
-      this.roundRect(ctx, L.ox + L.band, L.oy + L.band, L.ow - 2 * L.band, L.oh - 2 * L.band, Math.max(10, L.corner * 0.7));
-      ctx.fillStyle = PAL.gate;
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
-      ctx.lineWidth = 2;
-      ctx.stroke();
+      // бортик между трибуной и трассой
+      ctx.fillStyle = '#16302a';
+      ctx.fillRect(0, L.standH - 1, W, 5);
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+      ctx.fillRect(0, L.standH + 4, W, 1);
 
-      // старт/финиш - шахматка поперёк верхней стороны по центру
-      const sq = 7;
-      const sx = W / 2;
-      const yEnd = L.oy + L.band;
-      for (let yy = L.oy, row = 0; yy < yEnd; yy += sq, row++) {
-        ctx.fillStyle = row % 2 ? '#16302a' : '#fbfaf5';
-        ctx.fillRect(sx - 4, yy, 8, Math.min(sq, yEnd - yy));
+      // стартовые боксы слева
+      ctx.fillStyle = PAL.gate;
+      ctx.fillRect(0, L.standH + 4, L.gateW, L.trackH - 4);
+      for (let i = 0; i < L.lanes; i++) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.06)';
+        ctx.fillRect(4, L.laneTop + i * L.laneH + 3, L.gateW - 8, L.laneH - 6);
       }
 
-      ctx.restore();
+      // линия старта
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+      ctx.fillRect(L.startX - 1, L.laneTop, 3, lanesH);
 
-      // бортик трассы поверх покрытия
-      this.roundRect(ctx, L.ox, L.oy, L.ow, L.oh, L.corner + 6);
-      ctx.strokeStyle = '#16302a';
-      ctx.lineWidth = 4;
-      ctx.stroke();
+      // финиш - шахматка
+      const sq = 7;
+      for (let y = L.laneTop, row = 0; y < L.laneTop + lanesH; y += sq, row++) {
+        for (let col = 0; col < 2; col++) {
+          ctx.fillStyle = (row + col) % 2 ? '#16302a' : '#fbfaf5';
+          ctx.fillRect(L.finishX + col * sq, y, sq, Math.min(sq, L.laneTop + lanesH - y));
+        }
+      }
 
-      // тараканы-бегуны
+      // подписи и тараканы
       ctx.textBaseline = 'middle';
       for (const id of this.order) {
         const r = this.racers.get(id);
         if (!r) continue;
-        const loop = this.loops[r.lane];
-        if (!loop) continue;
-        const p = loop.at(r.x);
+        const cy = L.laneTop + (r.lane + 0.5) * L.laneH;
         const isYou = id === this.youId;
 
+        // номер и ник в стартовом боксе
+        const nx = L.narrow ? 15 : 20;
+        ctx.fillStyle = r.color;
+        ctx.beginPath();
+        ctx.arc(nx, cy, L.narrow ? 9 : 10, 0, TAU);
+        ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.font = '700 9px "Unbounded", "Arial Black", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(String(r.number), nx, cy + 0.5);
+        ctx.textAlign = 'left';
+        if (!L.narrow) {
+          ctx.fillStyle = PAL.gateText;
+          ctx.font = (isYou ? '600 ' : '400 ') + '14px "Golos Text", system-ui, sans-serif';
+          ctx.fillText(this.fit(ctx, r.nick, L.gateW - 44), 36, cy - (isYou ? 7 : 0));
+          if (isYou) {
+            ctx.fillStyle = '#f0b429';
+            ctx.font = '500 11px "Golos Text", system-ui, sans-serif';
+            ctx.fillText('это ты', 36, cy + 9);
+          }
+        } else {
+          ctx.fillStyle = 'rgba(22, 48, 42, 0.75)';
+          ctx.font = (isYou ? '600 ' : '400 ') + '10px "Golos Text", system-ui, sans-serif';
+          ctx.fillText(this.fit(ctx, isYou ? r.nick + ' (ты)' : r.nick, 150), L.startX + 6, L.laneTop + r.lane * L.laneH + 8);
+        }
+
+        // пыль из-под лапок
         for (const d of r.dust) {
           ctx.fillStyle = `rgba(120, 100, 70, ${d.life * 0.35})`;
           ctx.beginPath();
-          ctx.arc(d.x, d.y, 1.5 + (1 - d.life) * 2, 0, Math.PI * 2);
+          ctx.arc(d.x, cy + (d.y - cy), 1.5 + (1 - d.life) * 2, 0, TAU);
           ctx.fill();
         }
 
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        ctx.rotate(p.angle);
-        drawRoach(ctx, 0, 0, {
+        const p = this.racerPos(r, L);
+        drawRoach(ctx, p.x, p.y, {
           color: r.color,
           number: r.number,
           phase: r.phase,
@@ -1748,101 +1691,63 @@
           moving: r.moving > 0.05 ? 1 : 0,
           scale: L.roachScale,
         });
-        ctx.restore();
 
-        // ник и медаль смещаем к центру поля, чтобы не лезли в трибуны
-        const tdx = L.cx - p.x;
-        const tdy = L.cy - p.y;
-        const tl = Math.hypot(tdx, tdy) || 1;
-        const off = L.narrow ? 15 : 21;
-        const lx = p.x + (tdx / tl) * off;
-        const ly = p.y + (tdy / tl) * off;
-
-        if (!L.narrow) {
-          ctx.font = (isYou ? '600 ' : '400 ') + '12px "Golos Text", system-ui, sans-serif';
-          ctx.textAlign = 'center';
-          const label = this.fit(ctx, isYou ? r.nick + ' (ты)' : r.nick, 120);
-          ctx.lineWidth = 3;
-          ctx.strokeStyle = 'rgba(228, 220, 203, 0.9)';
-          ctx.strokeText(label, lx, ly);
-          ctx.fillStyle = isYou ? '#16302a' : 'rgba(22, 48, 42, 0.8)';
-          ctx.fillText(label, lx, ly);
-        }
-
+        // медаль за место у финиша
         if (r.place && !r.dnf) {
-          const mx = p.x + (tdx / tl) * (off + 6);
-          const my = p.y + (tdy / tl) * (off + 6);
+          const bx = L.finishX + 14 + (L.narrow ? 8 : 16);
           ctx.fillStyle = MEDALS[r.place] || '#8a9a92';
           ctx.beginPath();
-          ctx.arc(mx, my, L.narrow ? 9 : 12, 0, Math.PI * 2);
+          ctx.arc(bx, cy, L.narrow ? 10 : 13, 0, TAU);
           ctx.fill();
           ctx.fillStyle = PAL.ink;
           ctx.font = '800 11px "Unbounded", "Arial Black", sans-serif';
           ctx.textAlign = 'center';
-          ctx.fillText(String(r.place), mx, my + 0.5);
+          ctx.fillText(String(r.place), bx, cy + 0.5);
         }
       }
 
       this.drawEffects(L);
     }
 
-    // Трибуны: тёмный фон, скамейки, прожекторная подсветка
+    // Трибуна: светлый фон, два ряда скамеек, мягкие прожекторы над стартом и финишем
     drawStands(L, ctx) {
       const W = L.W;
-      const H = L.H;
-      ctx.fillStyle = PAL.stands;
-      ctx.fillRect(0, 0, W, H);
-
+      const s = L.crowdScale;
+      const g = ctx.createLinearGradient(0, 0, 0, L.standH);
+      g.addColorStop(0, '#d9d3c0');
+      g.addColorStop(1, '#ece7da');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, W, L.standH);
       const bench = (y, h) => {
         ctx.fillStyle = '#d2cab6';
         ctx.fillRect(0, y, W, h);
         ctx.fillStyle = '#f2eee2';
         ctx.fillRect(0, y, W, 1.5);
       };
-      const s = L.crowdScale;
-      // верх: задний и передний ряд скамеек (светлые трибуны - тёмные усы видно)
-      const gTop = ctx.createLinearGradient(0, 0, 0, L.oy);
-      gTop.addColorStop(0, '#d9d3c0');
-      gTop.addColorStop(1, '#ece7da');
-      ctx.fillStyle = gTop;
-      ctx.fillRect(0, 0, W, L.oy);
-      bench(L.oy - 14 * s, 4 * s);
-      bench(L.oy - 5 * s, 5 * s);
-      // низ
-      const by0 = L.oy + L.oh;
-      const gBot = ctx.createLinearGradient(0, by0, 0, H);
-      gBot.addColorStop(0, '#ece7da');
-      gBot.addColorStop(1, '#d9d3c0');
-      ctx.fillStyle = gBot;
-      ctx.fillRect(0, by0, W, H - by0);
-      bench(H - 15 * s, 4 * s);
-      bench(H - 6 * s, 6 * s);
-
-      // мягкий свет прожектора над стартом
-      const spot = ctx.createRadialGradient(L.cx, L.oy * 0.4, 4, L.cx, L.oy * 0.4, Math.max(120, W * 0.18));
-      spot.addColorStop(0, 'rgba(255, 214, 120, 0.22)');
-      spot.addColorStop(1, 'rgba(255, 214, 120, 0)');
-      ctx.fillStyle = spot;
-      ctx.fillRect(0, 0, W, L.oy);
+      bench(L.standH - 14 * s, 4 * s);
+      bench(L.standH - 5 * s, 5 * s);
+      for (const sp of this.crowd.spots || []) {
+        const r = Math.max(120, L.standH * 1.6);
+        const spot = ctx.createRadialGradient(sp.x, L.standH * 0.35, 4, sp.x, L.standH * 0.35, r);
+        spot.addColorStop(0, 'rgba(255, 214, 120, 0.24)');
+        spot.addColorStop(1, 'rgba(255, 214, 120, 0)');
+        ctx.fillStyle = spot;
+        ctx.fillRect(sp.x - r, 0, r * 2, L.standH);
+      }
     }
 
-    drawCrowd(L, t, ctx, side) {
+    drawCrowd(L, t, ctx) {
       const cheerMode = { waiting: 'idle', countdown: 'ready', racing: 'routine', finished: 'celebrate' }[this.phase] || 'idle';
-      // все смотрят на лидера (а до старта - на линию старта)
+      // все смотрят на лидера, а до старта - на линию старта
       const lead = this.leader && this.leader.x > 0 && this.leader.px !== undefined
         ? { x: this.leader.px, y: this.leader.py }
-        : { x: L.cx, y: L.oy + L.band / 2 };
-      const lookAt = (f) => {
-        const hx = f.x;
-        const hy = f.y - 50 * f.s;
-        return {
-          x: Math.max(-1, Math.min(1, (lead.x - hx) / 140)),
-          y: Math.max(-1, Math.min(1, (lead.y - hy) / 90)),
-        };
-      };
+        : { x: L.startX, y: L.laneTop + L.laneH };
+      const lookAt = (f) => ({
+        x: Math.max(-1, Math.min(1, (lead.x - f.x) / 160)),
+        y: Math.max(-1, Math.min(1, (lead.y - (f.y - 50 * f.s)) / 90)),
+      });
 
       for (const f of this.crowd.figs) {
-        if (f.side !== side) continue;
         const look = lookAt(f);
         let pose;
         let flip = f.flip;
@@ -1860,7 +1765,7 @@
           else if (lead.x > f.x + 30) f.flip = false;
           flip = f.flip;
           const dx = Math.abs(lead.x - f.x) || 1;
-          const tilt = Math.max(-0.45, Math.min(0.35, Math.atan2(lead.y - (f.y - 50 * f.s), dx)));
+          const tilt = Math.max(-0.45, Math.min(0.55, Math.atan2(lead.y - (f.y - 50 * f.s), dx)));
           pose = {
             look,
             blink: false,
@@ -1874,7 +1779,7 @@
         } else if (f.kind === 'mic') {
           const talking = Math.sin(t * 15 + f.ph) > 0;
           pose = {
-            look: { x: 0, y: 0.3 },
+            look: { x: -0.4, y: 0.6 },
             blink,
             mids: 'hips',
             hands: [{ x: -16, y: 2 + Math.sin(t * 4 + f.ph) * 5 }, { x: 16, y: -9 }],
@@ -1899,43 +1804,41 @@
         drawStander(ctx, f.x, f.y, f.s, flip, f.pal, pose, f.acc, t);
       }
 
-      // транспаранты поверх голов
+      // транспаранты над головами
       for (const c of this.crowd.banners) {
-        if (c.side !== side) continue;
         const [a, b] = c.holders;
         if (!a || !b) continue;
-        // нижний край транспаранта - в поднятых лапах, сам он над головами
         const h = 13 * a.s;
         const top = a.y - (60 + c.jump) * a.s - h + 2 * a.s;
         const x0 = a.x - 11 * a.s;
         const x1 = b.x + 11 * b.s;
-        const sag = Math.sin(t * 3 + c.ph) * 1.5;
+        const sag = Math.sin(t * 3 + c.ph) * 1.5 * a.s;
         ctx.fillStyle = '#fbfaf5';
         ctx.beginPath();
         ctx.moveTo(x0, top);
-        ctx.quadraticCurveTo((x0 + x1) / 2, top + 3 + sag, x1, top);
+        ctx.quadraticCurveTo((x0 + x1) / 2, top + 3 * a.s + sag, x1, top);
         ctx.lineTo(x1, top + h);
-        ctx.quadraticCurveTo((x0 + x1) / 2, top + h + 3 + sag, x0, top + h);
+        ctx.quadraticCurveTo((x0 + x1) / 2, top + h + 3 * a.s + sag, x0, top + h);
         ctx.closePath();
         ctx.fill();
         ctx.strokeStyle = '#d64532';
-        ctx.lineWidth = 1.2;
+        ctx.lineWidth = 1.2 * a.s;
         ctx.stroke();
         ctx.fillStyle = '#d64532';
         ctx.font = `800 ${9 * a.s}px "Unbounded", "Arial Black", sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillText(c.banner, (x0 + x1) / 2, top + h / 2 + 1.5 + sag * 0.6);
+        ctx.fillText(c.banner, (x0 + x1) / 2, top + h / 2 + 1.5 * a.s + sag * 0.6);
       }
 
       // табличка «ПРЕССА»
       const pr = this.crowd.press;
-      if (pr && side === 'bottom') {
+      if (pr) {
         ctx.fillStyle = '#fbfaf5';
-        this.roundRect(ctx, pr.x, pr.y, pr.w, pr.h, 3);
+        this.roundRect(ctx, pr.x, pr.y, pr.w, pr.h, 3 * L.crowdScale);
         ctx.fill();
         ctx.strokeStyle = '#16302a';
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 1.5 * L.crowdScale;
         ctx.stroke();
         ctx.fillStyle = '#16302a';
         ctx.font = `800 ${8 * L.crowdScale}px "Unbounded", "Arial Black", sans-serif`;
@@ -1999,7 +1902,7 @@
         const id = this.order.length ? this.order[c.team % this.order.length] : null;
         const r = id && this.racers.get(id);
         f.acc.flag = r ? r.color : FAN_COLORS[c.team % FAN_COLORS.length];
-        if (f.depth) f.acc.flag = shade(f.acc.flag, -0.28);
+        if (f.depth) f.acc.flag = shade(f.acc.flag, -0.22);
       }
       return pose;
     }
@@ -2018,7 +1921,7 @@
         ctx.arc(fl.x, fl.y, r, 0, TAU);
         ctx.fill();
         ctx.strokeStyle = `rgba(255, 255, 255, ${fl.life})`;
-        ctx.lineWidth = 1.4;
+        ctx.lineWidth = 1.4 * fl.s;
         ctx.beginPath();
         const ray = r * 0.75;
         ctx.moveTo(fl.x - ray, fl.y);
@@ -2033,7 +1936,8 @@
         ctx.rotate(p.rot);
         ctx.globalAlpha = Math.min(1, p.life);
         ctx.fillStyle = p.color;
-        ctx.fillRect(-2.2 * L.crowdScale, -1.3 * L.crowdScale, 4.4 * L.crowdScale, 2.6 * L.crowdScale);
+        const k = Math.min(1.6, p.size || 1);
+        ctx.fillRect(-2.4 * k, -1.4 * k, 4.8 * k, 2.8 * k);
         ctx.restore();
       }
       ctx.globalAlpha = 1;

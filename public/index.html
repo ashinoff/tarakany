@@ -82,30 +82,32 @@
     <div class="race-stage" aria-label="Трасса">
       <canvas id="track"></canvas>
 
-      <div id="ringInner" class="ring-inner">
-        <aside class="standings" aria-label="Таблица мест">
-          <h3 class="standings-title">Табло</h3>
-          <ol id="standingsList" class="standings-list"></ol>
-          <div class="my-stats">
-            <div class="stat"><b id="statSpeed">0</b><span>зн/мин</span></div>
-            <div class="stat"><b id="statAcc">100</b><span>точность %</span></div>
-            <div class="stat"><b id="statProgress">0</b><span>пройдено %</span></div>
-          </div>
-        </aside>
-
-        <div class="center-main">
-          <section id="typing" class="typing" hidden>
-            <div id="textBox" class="text-box placeholder"></div>
-            <input id="typeInput" class="type-input" type="text" aria-label="Набирай текст здесь"
-                   autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="next">
-            <p id="hint" class="hint" role="status"></p>
-          </section>
-
-          <section id="board" class="board" aria-live="polite"></section>
-        </div>
-      </div>
-
       <div id="overlay" class="overlay" hidden></div>
+    </div>
+
+    <!-- под трассой: табло слева, текст справа -->
+    <div id="racePanel" class="race-panel">
+      <aside class="standings" aria-label="Таблица мест">
+        <h3 class="standings-title">Табло</h3>
+        <ol id="standingsList" class="standings-list"></ol>
+        <div class="my-stats">
+          <div class="stat"><b id="statSpeed">0</b><span>зн/мин</span></div>
+          <div class="stat"><b id="statAcc">100</b><span>точность %</span></div>
+          <div class="stat"><b id="statProgress">0</b><span>пройдено %</span></div>
+        </div>
+      </aside>
+
+      <div class="center-main">
+        <section id="typing" class="typing" hidden>
+          <div id="textBox" class="text-box placeholder"></div>
+          <input id="typeInput" class="type-input" type="text" aria-label="Набирай текст здесь"
+                 autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="next"
+                 inputmode="text" data-gramm="false">
+          <p id="hint" class="hint" role="status"></p>
+        </section>
+
+        <section id="board" class="board" aria-live="polite"></section>
+      </div>
     </div>
 
     <p id="spectators" class="spectators"></p>

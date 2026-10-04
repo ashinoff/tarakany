@@ -46,7 +46,6 @@
   // ---------- Состояние ----------
   const socket = io();
   const track = new window.Track($('track'));
-  track.ring = $('ringInner'); // панель со счётом и текстом в центре кольца
   window.RoachArt.startHeroRoach($('hero'));
 
   let me = { id: null, nick: '' };
@@ -285,6 +284,7 @@
     newQuip();
     track.resetPositions();
     setHint('');
+    resetField();
     focusInput();
   }
 
@@ -311,6 +311,7 @@
   const norm = (c) => (c === 'ё' ? 'е' : c === 'Ё' ? 'Е' : c === '\u00a0' ? ' ' : c);
   const same = (a, b) => a === b || norm(a) === norm(b);
 
+  const isTouch = window.matchMedia('(hover: none)').matches;
   const isLatin = (c) => /[a-z]/i.test(c);
   const isCyrillic = (c) => /[а-яё]/i.test(c);
 
@@ -329,6 +330,9 @@
       if (!errAt) {
         errAt = true;
         errors++; // одна буква - одна ошибка, сколько ни долби мимо
+      }
+      if (isTouch && navigator.vibrate) {
+        try { navigator.vibrate(25); } catch { /* не все браузеры разрешают */ }
       }
       if (isLatin(ch) && isCyrillic(expected)) setHint('Похоже, включена английская раскладка. Переключись на русскую.');
       else setHint('Не та буква - таракан замер. Нажми правильную, чтобы бежать дальше.');
@@ -379,16 +383,49 @@
     }
   });
 
-  // мобильные клавиатуры часто не сообщают клавишу в keydown - ловим через input
+  // Мобильные клавиатуры (особенно Android) не сообщают клавишу в keydown и набирают
+  // слово «составом», переписывая уже введённое. Поэтому поле не чистим на каждой букве,
+  // а сравниваем, что в нём было и что стало: новые символы - это нажатия.
+  let shadow = '';
+  let composing = false;
+  const resetField = () => {
+    input.value = '';
+    shadow = '';
+  };
+  input.addEventListener('compositionstart', () => (composing = true));
+  input.addEventListener('compositionend', () => (composing = false));
   input.addEventListener('input', () => {
     const v = input.value;
-    input.value = '';
-    for (const ch of v) onChar(ch);
+    let i = 0;
+    while (i < shadow.length && i < v.length && shadow[i] === v[i]) i++;
+    const removed = shadow.length - i;
+    const added = v.slice(i);
+    shadow = v;
+    if (removed > 0 && !added) onBackspace();
+    for (const ch of added) onChar(ch);
+    // поле не копим: чистим на границе слова, когда клавиатура не собирает слово
+    if (!composing && (v.endsWith(' ') || v.length > 30)) resetField();
+  });
+  input.addEventListener('blur', () => {
+    if (!composing) resetField();
   });
   input.addEventListener('paste', (e) => e.preventDefault());
   input.addEventListener('drop', (e) => e.preventDefault());
   input.addEventListener('focus', () => $('textBox').classList.add('focused'));
   input.addEventListener('blur', () => $('textBox').classList.remove('focused'));
+
+  // открылась клавиатура телефона - подтягиваем трассу к верху экрана,
+  // чтобы над клавиатурой были видны и тараканы, и текст
+  function pinStageOnPhone() {
+    if ($('race').hidden || document.activeElement !== input || window.innerWidth >= 760) return;
+    const stage = document.querySelector('.race-stage');
+    requestAnimationFrame(() => {
+      const top = stage.getBoundingClientRect().top + window.scrollY;
+      window.scrollTo({ top: Math.max(0, top - 2), behavior: 'auto' });
+    });
+  }
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', pinStageOnPhone);
+  input.addEventListener('focus', () => setTimeout(pinStageOnPhone, 350));
 
   function focusInput() {
     if (!$('race').hidden) input.focus({ preventScroll: true });
@@ -441,6 +478,16 @@
       `<span class="t-done">${escapeHtml(done)}</span>` +
       (cur ? `<span class="t-cur${errAt ? ' error' : ''}">${escapeHtml(cur)}</span>` : '') +
       `<span class="t-rest">${escapeHtml(rest)}</span>`;
+    keepCursorVisible(box);
+  }
+
+  // длинный текст в невысоком окне (телефон) сам прокручивается за курсором
+  function keepCursorVisible(box) {
+    const curEl = box.querySelector('.t-cur');
+    if (!curEl || box.scrollHeight <= box.clientHeight + 2) return;
+    const line = curEl.offsetHeight || 30;
+    const y = curEl.offsetTop - box.scrollTop;
+    if (y > box.clientHeight - line * 1.8 || y < line * 0.2) box.scrollTop = Math.max(0, curEl.offsetTop - line * 1.1);
   }
 
   function shake() {
