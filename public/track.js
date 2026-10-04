@@ -18,7 +18,7 @@
     pronotum: '#7b4a2a',
     rim: '#b07b4c',
     head: '#2b190e',
-    stands: '#17231e',
+    stands: '#e7e2d4',
   };
 
   const MEDALS = { 1: '#f0b429', 2: '#c9ced3', 3: '#c98b4e' };
@@ -1794,16 +1794,16 @@
       ctx.fillRect(0, 0, W, H);
 
       const bench = (y, h) => {
-        ctx.fillStyle = '#24372f';
+        ctx.fillStyle = '#d2cab6';
         ctx.fillRect(0, y, W, h);
-        ctx.fillStyle = '#35503f';
+        ctx.fillStyle = '#f2eee2';
         ctx.fillRect(0, y, W, 1.5);
       };
       const s = L.crowdScale;
-      // верх: задний и передний ряд скамеек
+      // верх: задний и передний ряд скамеек (светлые трибуны - тёмные усы видно)
       const gTop = ctx.createLinearGradient(0, 0, 0, L.oy);
-      gTop.addColorStop(0, '#0f1814');
-      gTop.addColorStop(1, '#1c2b25');
+      gTop.addColorStop(0, '#d9d3c0');
+      gTop.addColorStop(1, '#ece7da');
       ctx.fillStyle = gTop;
       ctx.fillRect(0, 0, W, L.oy);
       bench(L.oy - 14 * s, 4 * s);
@@ -1811,8 +1811,8 @@
       // низ
       const by0 = L.oy + L.oh;
       const gBot = ctx.createLinearGradient(0, by0, 0, H);
-      gBot.addColorStop(0, '#1c2b25');
-      gBot.addColorStop(1, '#0f1814');
+      gBot.addColorStop(0, '#ece7da');
+      gBot.addColorStop(1, '#d9d3c0');
       ctx.fillStyle = gBot;
       ctx.fillRect(0, by0, W, H - by0);
       bench(H - 15 * s, 4 * s);
@@ -1820,8 +1820,8 @@
 
       // мягкий свет прожектора над стартом
       const spot = ctx.createRadialGradient(L.cx, L.oy * 0.4, 4, L.cx, L.oy * 0.4, Math.max(120, W * 0.18));
-      spot.addColorStop(0, 'rgba(255, 236, 170, 0.16)');
-      spot.addColorStop(1, 'rgba(255, 236, 170, 0)');
+      spot.addColorStop(0, 'rgba(255, 214, 120, 0.22)');
+      spot.addColorStop(1, 'rgba(255, 214, 120, 0)');
       ctx.fillStyle = spot;
       ctx.fillRect(0, 0, W, L.oy);
     }

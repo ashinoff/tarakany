@@ -402,6 +402,21 @@ io.on('connection', (socket) => {
     startCountdown(room);
   });
 
+  socket.on('giveup', () => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!room || room.state !== 'racing') return;
+    const p = room.players.get(socket.id);
+    if (!p || p.spectator || p.finishedAt) return;
+    const now = Date.now();
+    p.dnf = true;
+    p.finishedAt = now;
+    p.place = ++room.finishCount;
+    const minutes = Math.max(1 / 60, (now - room.startAt) / 60000);
+    p.cpm = Math.round(p.progress / minutes);
+    p.acc = p.progress ? Math.round((1000 * p.progress) / (p.progress + p.errors)) / 10 : 0;
+    room.dirty = true;
+  });
+
   socket.on('kick', (data) => {
     const room = rooms.get(socket.data.roomCode);
     if (!room || room.hostId !== socket.id) return;

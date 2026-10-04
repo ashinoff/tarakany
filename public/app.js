@@ -61,6 +61,7 @@
   let pos = 0;
   let errAt = false; // на текущей букве стоит ошибка: таракан замер, пока не нажмут верную
   let errors = 0;
+  let gaveUp = false; // игрок сдался в этом заезде
   let raceStartAt = 0;
   let lastSentPos = 0;
 
@@ -144,6 +145,13 @@
     resetTyping();
     history.replaceState(null, '', location.pathname);
     showScreen('login');
+  });
+
+  $('giveupBtn').addEventListener('click', () => {
+    if (gaveUp || !room || room.state !== 'racing') return;
+    gaveUp = true;
+    socket.emit('giveup');
+    setHint('Ты сдался. Таракан замер — ждём финиша остальных.');
   });
 
   $('copyLink').addEventListener('click', async () => {
@@ -272,6 +280,7 @@
     pos = 0;
     errAt = false;
     errors = 0;
+    gaveUp = false;
     lastSentPos = 0;
     newQuip();
     track.resetPositions();
@@ -284,15 +293,16 @@
     pos = 0;
     errAt = false;
     errors = 0;
+    gaveUp = false;
     raceStartAt = 0;
     lastSentPos = 0;
     setHint('');
   }
 
   function canType() {
-    if (!room || !text) return false;
+    if (!room || !text || gaveUp) return false;
     const mine = myPlayer();
-    if (!mine || mine.spectator || pos >= text.length) return false;
+    if (!mine || mine.spectator || mine.finished || pos >= text.length) return false;
     if (room.state === 'racing') return true;
     return room.state === 'countdown' && serverNow() >= room.startAt;
   }
@@ -451,6 +461,9 @@
     const codePart = !room.auto ? ` · код ${room.code}` : '';
     $('roomLabel').textContent = `${where} · тараканов ${count}/${room.maxPlayers}${codePart}`;
     $('copyLink').hidden = room.auto; // в именованных комнатах можно звать по ссылке
+    const mineNow = myPlayer();
+    const inRace = room.state === 'racing' || room.state === 'countdown';
+    $('giveupBtn').hidden = !(inRace && mineNow && !mineNow.spectator && !mineNow.finished);
   }
 
   function renderSpectators() {
