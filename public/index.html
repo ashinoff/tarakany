@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Тараканьи бега</title>
+  <meta name="description" content="Онлайн-гонка тараканов для тренировки скоростной печати на русском языке.">
+  <meta name="theme-color" content="#2e5a4c">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪳</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Unbounded:wght@600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ===== Вход ===== -->
+  <main id="login" class="screen">
+    <header class="whitewash">
+      <div class="wrap">
+        <h1 class="title">Тараканьи<br>бега</h1>
+        <p class="lead">Печатай текст, и твой таракан побежит. Первым до финиша доберётся тот, кто наберёт всё быстрее и без ошибок.</p>
+      </div>
+    </header>
+
+    <canvas id="hero" class="skirting" aria-hidden="true"></canvas>
+
+    <div class="paint">
+      <div class="wrap login-grid">
+        <form id="loginForm" class="enamel login-form" novalidate>
+          <label for="nick">Ник</label>
+          <input id="nick" name="nick" maxlength="16" autocomplete="nickname" placeholder="Например, Рыжий" required>
+          <button type="submit" id="quickBtn" class="btn primary big">В гонку</button>
+
+          <p class="divider">или с друзьями</p>
+          <button type="button" id="createBtn" class="btn">Создать комнату</button>
+          <div class="code-row">
+            <label class="visually-hidden" for="code">Код комнаты</label>
+            <input id="code" maxlength="8" placeholder="Код комнаты" autocomplete="off" autocapitalize="characters" spellcheck="false">
+            <button type="button" id="codeBtn" class="btn">Войти</button>
+          </div>
+          <p id="loginError" class="error" role="alert"></p>
+        </form>
+
+        <aside class="records" aria-labelledby="recordsTitle">
+          <h2 id="recordsTitle">Самые быстрые</h2>
+          <ol id="recordsList">
+            <li class="empty">Загружаем таблицу…</li>
+          </ol>
+        </aside>
+      </div>
+    </div>
+  </main>
+
+  <!-- ===== Заезд ===== -->
+  <main id="race" class="screen" hidden>
+    <header class="topbar">
+      <div class="wrap topbar-inner">
+        <span class="brand">Тараканьи бега</span>
+        <span id="roomLabel" class="room-label"></span>
+        <span class="topbar-actions">
+          <button type="button" id="copyLink" class="btn small" hidden>Скопировать ссылку</button>
+          <button type="button" id="leaveBtn" class="btn small ghost">Выйти</button>
+        </span>
+      </div>
+    </header>
+
+    <div class="wrap race-body">
+      <section class="track-wrap" aria-label="Трасса">
+        <canvas id="track"></canvas>
+        <div id="overlay" class="overlay" hidden></div>
+      </section>
+      <p id="spectators" class="spectators"></p>
+
+      <section id="board" class="enamel board" aria-live="polite"></section>
+
+      <section id="typing" class="typing" hidden>
+        <div id="textBox" class="text-box placeholder"></div>
+        <input id="typeInput" class="type-input" type="text" aria-label="Набирай текст здесь"
+               autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="next">
+        <div class="stats">
+          <span><b id="statSpeed">0</b> зн/мин</span>
+          <span>точность <b id="statAcc">100</b>%</span>
+          <span>пройдено <b id="statProgress">0</b>%</span>
+          <span>время <b id="statTime">0:00</b></span>
+          <span id="statPlace" class="place-note"></span>
+        </div>
+        <p id="hint" class="hint" role="status"></p>
+      </section>
+    </div>
+
+    <div id="offline" class="offline" role="alert" hidden>Связь с сервером пропала. Переподключаемся…</div>
+  </main>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="track.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
