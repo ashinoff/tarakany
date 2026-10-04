@@ -1168,7 +1168,7 @@
       const vv = window.visualViewport;
       const kbOpen = narrow && vv && vv.height < vh * 0.8;
       const budget = kbOpen
-        ? Math.max(230, vv.height - 175)
+        ? Math.max(210, vv.height - 170) // оставляем запас снизу под текст (2 строки) + зазор над клавиатурой
         : Math.max(narrow ? 250 : 300, Math.min(680, vh - (narrow ? 96 : 110) - (narrow ? 330 : 290)));
       const standMin = narrow ? 86 : 124;
       const standMax = narrow ? 128 : 220;
@@ -1196,6 +1196,10 @@
       const w = Math.max(280, Math.floor(parent.clientWidth));
       const dpr = Math.min(2, window.devicePixelRatio || 1);
       this.cssW = w;
+      // телефон с открытой клавиатурой - помечаем, чтобы CSS ужал текст и спрятал лишнее
+      const vv = window.visualViewport;
+      const kbOpen = this.narrow && vv && vv.height < (window.innerHeight || 800) * 0.8;
+      document.documentElement.classList.toggle('kb-open', !!kbOpen);
       const L = this.layout();
       const key = `${w}|${L.H}|${L.standH}|${L.laneH}|${L.lanes}|${dpr}`;
       this._L = L;

@@ -573,6 +573,12 @@ p { margin: 0; }
     touch-action: none;
     overscroll-behavior: contain;
   }
+  /* клавиатура открыта: текст в 2 строки, лишнее прячем - окно гарантированно над клавиатурой */
+  .kb-open .quip,
+  .kb-open #spectators,
+  .kb-open .standings { display: none; }
+  .kb-open .race-stage { margin-top: 2px; }
+  .kb-open #typing .text-box:not(.placeholder) { height: calc(1.7em * 2 + 18px); margin-bottom: 8px; }
   .quip { font-size: 14px; padding-top: 8px; }
   .room-label { flex-basis: 100%; order: 5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .standings-list { font-size: 13px; }
