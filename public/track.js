@@ -1,4 +1,4 @@
-/* Трасса тараканьих бегов: рисуем всё на canvas, без картинок. */
+/* Трасса тараканьих бегов: кольцевой стадион, всё рисуем на canvas, без картинок. */
 (function () {
   'use strict';
 
@@ -142,7 +142,7 @@
     ctx.restore();
   }
 
-  // ---------- Трасса ----------
+  // ---------- Трасса (кольцо) ----------
   class Track {
     constructor(canvas) {
       this.canvas = canvas;
@@ -155,6 +155,9 @@
       this.cssH = 0;
       this.dpr = 1;
       this.tilePattern = null;
+      this.loops = [];
+      this.boundInsets = [];
+      this.ring = null; // HTML-панель в центре кольца; её inset выставляем по геометрии
       this.last = performance.now();
       this.resize(true);
       window.addEventListener('resize', () => this.resize(true));
@@ -166,29 +169,108 @@
     }
 
     layout() {
-      const laneH = this.narrow ? 50 : 58;
-      const gateW = this.narrow ? 30 : 132;
-      const bodyL = this.narrow ? 38 : 48;
-      const startX = gateW + bodyL + 8;
-      const finishX = this.cssW - (this.narrow ? 34 : 46);
-      return { laneH, gateW, bodyL, startX, finishX, top: 10, bottom: 10 };
+      const W = this.cssW;
+      const H = this.cssH;
+      const narrow = this.narrow;
+      const pad = narrow ? 6 : 10;
+      const lanes = Math.max(3, this.order.length);
+      const minSide = Math.min(W, H);
+      const band = narrow
+        ? Math.min(Math.max(44, minSide * 0.18), 92)
+        : Math.min(Math.max(92, minSide * 0.17), 150);
+      const edge = narrow ? 8 : 12; // от края трассы до первой дорожки
+      const laneSpan = Math.max(1, band - edge - 6);
+      const gap = laneSpan / lanes;
+      const corner = narrow ? 22 : 42;
+      const roachScale = narrow ? 0.6 : 0.95;
+      const baseInset = pad + edge; // центр дорожки i = baseInset + (i + 0.5) * gap
+      const infieldInset = pad + band; // внутренний край трассы = начало поля
+      return { W, H, narrow, pad, lanes, band, gap, corner, roachScale, baseInset, infieldInset };
+    }
+
+    // Замкнутая дорожка - скруглённый прямоугольник, вставленный на inset от краёв.
+    // at(f) по доле пути [0..1) даёт точку и угол направления движения (против часовой,
+    // старт в середине нижней стороны, таракан сперва бежит вправо).
+    makeLoop(inset, L) {
+      const x = inset;
+      const y = inset;
+      const w = L.W - 2 * inset;
+      const h = L.H - 2 * inset;
+      const r = Math.max(6, Math.min(L.corner, Math.min(w, h) / 2 - 2));
+      const segs = [];
+      const straight = (ax, ay, bx, by) => {
+        const dx = bx - ax;
+        const dy = by - ay;
+        const len = Math.hypot(dx, dy) || 0.0001;
+        segs.push({ len, pt: (d) => ({ x: ax + dx * (d / len), y: ay + dy * (d / len) }) });
+      };
+      const arc = (cx, cy, a0, a1) => {
+        const len = Math.abs(a1 - a0) * r || 0.0001;
+        segs.push({
+          len,
+          pt: (d) => {
+            const a = a0 + (a1 - a0) * (d / len);
+            return { x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r };
+          },
+        });
+      };
+      straight(x + r, y + h, x + w - r, y + h); // низ, вправо
+      arc(x + w - r, y + h - r, Math.PI / 2, 0); // угол справа снизу
+      straight(x + w, y + h - r, x + w, y + r); // право, вверх
+      arc(x + w - r, y + r, 0, -Math.PI / 2); // угол справа сверху
+      straight(x + w - r, y, x + r, y); // верх, влево
+      arc(x + r, y + r, -Math.PI / 2, -Math.PI); // угол слева сверху
+      straight(x, y + r, x, y + h - r); // лево, вниз
+      arc(x + r, y + h - r, Math.PI, Math.PI / 2); // угол слева снизу
+
+      const total = segs.reduce((s, g) => s + g.len, 0) || 1;
+      const startDist = Math.max(0, w / 2 - r); // f = 0 в середине нижней стороны
+      const raw = (dist) => {
+        let d = ((dist % total) + total) % total;
+        for (const g of segs) {
+          if (d <= g.len) return g.pt(d);
+          d -= g.len;
+        }
+        const last = segs[segs.length - 1];
+        return last.pt(last.len);
+      };
+      return {
+        len: total,
+        rect: { x, y, w, h, r },
+        at: (f) => {
+          const base = startDist + f * total;
+          const p = raw(base);
+          const p2 = raw(base + 1.4);
+          return { x: p.x, y: p.y, angle: Math.atan2(p2.y - p.y, p2.x - p.x) };
+        },
+      };
+    }
+
+    buildLoops() {
+      const L = (this._L = this.layout());
+      this.loops = [];
+      for (let i = 0; i < L.lanes; i++) this.loops.push(this.makeLoop(L.baseInset + (i + 0.5) * L.gap, L));
+      this.boundInsets = [];
+      for (let i = 1; i < L.lanes; i++) this.boundInsets.push(L.baseInset + i * L.gap);
+      if (this.ring) {
+        const ins = Math.round(L.infieldInset + (L.narrow ? 6 : 14));
+        this.ring.style.inset = ins + 'px';
+      }
     }
 
     resize(force) {
       const parent = this.canvas.parentElement;
       const w = Math.max(280, Math.floor(parent.clientWidth));
-      const lanes = Math.max(3, this.order.length);
-      const L = (this.cssW = w, this.layout());
-      const h = L.top + lanes * L.laneH + L.bottom;
+      const h = Math.max(300, Math.floor(parent.clientHeight));
       const dpr = Math.min(2, window.devicePixelRatio || 1);
-      if (!force && w === this.lastW && h === this.cssH && dpr === this.dpr) return;
-      this.lastW = w;
+      if (!force && w === this.cssW && h === this.cssH && dpr === this.dpr) return;
+      this.cssW = w;
       this.cssH = h;
       this.dpr = dpr;
-      this.canvas.style.height = h + 'px';
       this.canvas.width = Math.round(w * dpr);
       this.canvas.height = Math.round(h * dpr);
-      this.buildPattern(L.laneH / 2);
+      this.buildPattern(this.narrow ? 16 : 22);
+      this.buildLoops();
     }
 
     buildPattern(size) {
@@ -232,7 +314,7 @@
       });
       const changed = this.order.length !== players.length;
       this.order = players.map((p) => p.id);
-      if (changed) this.resize(false);
+      if (changed) this.buildLoops();
     }
 
     setProgress(id, progress) {
@@ -251,155 +333,167 @@
     frame(t) {
       const dt = Math.min(0.05, (t - this.last) / 1000);
       this.last = t;
-      const L = this.layout();
-      const runPx = L.finishX - L.startX;
 
       for (const r of this.racers.values()) {
+        const loop = this.loops[r.lane] || this.loops[0];
         const prev = r.x;
         r.x += (r.target - r.x) * Math.min(1, dt * 7);
         if (Math.abs(r.target - r.x) < 0.0004) r.x = r.target;
-        const movedPx = (r.x - prev) * runPx;
+        const movedPx = Math.abs(r.x - prev) * (loop ? loop.len : 600);
         r.moving = r.moving * 0.85 + Math.min(1, movedPx / (dt * 60 || 1)) * 0.15;
         r.phase += movedPx * 0.45;
         r.twitch += dt * (2 + r.moving * 10);
 
-        if (!reducedMotion) {
+        if (!reducedMotion && loop) {
           if (movedPx > 0.4 && Math.random() < 0.6) {
-            const cx = L.startX - L.bodyL / 2 + r.x * runPx;
-            r.dust.push({ x: cx - 20, y: (Math.random() - 0.5) * 14, life: 1, vx: -20 - Math.random() * 30 });
+            const a = loop.at(r.x);
+            r.dust.push({
+              x: a.x - Math.cos(a.angle) * 16,
+              y: a.y - Math.sin(a.angle) * 16,
+              life: 1,
+              vx: (Math.random() - 0.5) * 26,
+              vy: (Math.random() - 0.5) * 26,
+            });
             if (r.dust.length > 24) r.dust.shift();
           }
           for (const d of r.dust) {
             d.life -= dt * 2.2;
             d.x += d.vx * dt;
+            d.y += d.vy * dt;
           }
           r.dust = r.dust.filter((d) => d.life > 0);
         }
       }
 
-      this.draw(L);
+      this.draw();
       requestAnimationFrame((tt) => this.frame(tt));
     }
 
-    draw(L) {
+    draw() {
+      const L = this._L || this.layout();
+      this._L = L;
       const ctx = this.ctx;
-      const W = this.cssW;
-      const H = this.cssH;
+      const W = L.W;
+      const H = L.H;
+
+      // покрытие (плитка) на всё поле
       ctx.setTransform(1, 0, 0, 1, 0, 0);
       ctx.fillStyle = this.tilePattern || PAL.tileA;
       ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
       ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
 
-      const lanes = Math.max(3, this.order.length);
+      // внешняя рамка трассы
+      this.roundRect(ctx, L.pad, L.pad, W - 2 * L.pad, H - 2 * L.pad, L.corner + 6);
+      ctx.strokeStyle = 'rgba(22, 48, 42, 0.55)';
+      ctx.lineWidth = 3;
+      ctx.stroke();
 
-      // своя дорожка
+      // подсветка твоей дорожки (широкая мягкая лента)
       const you = this.racers.get(this.youId);
-      if (you) {
-        ctx.fillStyle = PAL.you;
-        ctx.fillRect(0, L.top + you.lane * L.laneH, W, L.laneH);
+      if (you && this.loops[you.lane]) {
+        const rc = this.loops[you.lane].rect;
+        this.roundRect(ctx, rc.x, rc.y, rc.w, rc.h, rc.r);
+        ctx.strokeStyle = PAL.you;
+        ctx.lineWidth = Math.max(6, L.gap * 0.82);
+        ctx.stroke();
       }
 
       // разделители дорожек
       ctx.strokeStyle = 'rgba(33, 68, 55, 0.35)';
       ctx.lineWidth = 1.5;
-      ctx.setLineDash([10, 8]);
-      for (let i = 0; i <= lanes; i++) {
-        const y = L.top + i * L.laneH + 0.5;
-        ctx.beginPath();
-        ctx.moveTo(L.gateW, y);
-        ctx.lineTo(W, y);
+      ctx.setLineDash([11, 9]);
+      for (const ins of this.boundInsets) {
+        this.roundRect(ctx, ins, ins, W - 2 * ins, H - 2 * ins, Math.max(6, L.corner - (ins - L.baseInset)));
         ctx.stroke();
       }
       ctx.setLineDash([]);
 
-      // стартовые боксы
+      // поле внутри кольца (сюда ложится панель со счётом и текстом)
+      const ii = L.infieldInset;
+      this.roundRect(ctx, ii, ii, W - 2 * ii, H - 2 * ii, Math.max(10, L.corner * 0.7));
       ctx.fillStyle = PAL.gate;
-      ctx.fillRect(0, 0, L.gateW, H);
-      for (let i = 0; i < lanes; i++) {
-        const y = L.top + i * L.laneH;
-        ctx.fillStyle = 'rgba(255,255,255,0.06)';
-        ctx.fillRect(4, y + 3, L.gateW - 8, L.laneH - 6);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // старт/финиш - шахматка поперёк нижней стороны по центру
+      const sq = 7;
+      const sx = W / 2;
+      for (let yy = H - ii, row = 0; yy < H - L.pad; yy += sq, row++) {
+        ctx.fillStyle = row % 2 ? '#16302a' : '#fbfaf5';
+        ctx.fillRect(sx - 4, yy, 8, Math.min(sq, H - L.pad - yy));
       }
 
-      // линия старта
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-      ctx.fillRect(L.startX - 1, L.top, 3, lanes * L.laneH);
-
-      // финиш - шахматка
-      const sq = 6;
-      for (let y = L.top, row = 0; y < L.top + lanes * L.laneH; y += sq, row++) {
-        for (let col = 0; col < 2; col++) {
-          ctx.fillStyle = (row + col) % 2 ? '#16302a' : '#fbfaf5';
-          ctx.fillRect(L.finishX + col * sq, y, sq, Math.min(sq, L.top + lanes * L.laneH - y));
-        }
-      }
-
-      // подписи и тараканы
+      // тараканы
       ctx.textBaseline = 'middle';
       for (const id of this.order) {
         const r = this.racers.get(id);
         if (!r) continue;
-        const cy = L.top + r.lane * L.laneH + L.laneH / 2;
+        const loop = this.loops[r.lane];
+        if (!loop) continue;
+        const p = loop.at(r.x);
         const isYou = id === this.youId;
 
-        // номер и ник в стартовом боксе
-        ctx.fillStyle = r.color;
-        ctx.beginPath();
-        ctx.arc(this.narrow ? 15 : 20, cy, 9, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = '#fff';
-        ctx.font = '700 9px "Unbounded", "Arial Black", sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(String(r.number), this.narrow ? 15 : 20, cy + 0.5);
-
-        ctx.textAlign = 'left';
-        if (!this.narrow) {
-          ctx.fillStyle = PAL.gateText;
-          ctx.font = (isYou ? '600 ' : '400 ') + '13px "Golos Text", system-ui, sans-serif';
-          ctx.fillText(this.fit(ctx, r.nick, L.gateW - 42), 34, cy - (isYou ? 6 : 0));
-          if (isYou) {
-            ctx.fillStyle = '#f0b429';
-            ctx.font = '500 11px "Golos Text", system-ui, sans-serif';
-            ctx.fillText('это ты', 34, cy + 9);
-          }
-        } else {
-          ctx.fillStyle = 'rgba(22, 48, 42, 0.75)';
-          ctx.font = (isYou ? '600 ' : '400 ') + '10px "Golos Text", system-ui, sans-serif';
-          ctx.fillText(this.fit(ctx, isYou ? r.nick + ' (ты)' : r.nick, 140), L.startX + 6, L.top + r.lane * L.laneH + 8);
-        }
-
-        const cx = L.startX - L.bodyL / 2 + r.x * (L.finishX - L.startX);
-
-        // пыль
+        // пыль из-под лапок
         for (const d of r.dust) {
           ctx.fillStyle = `rgba(120, 100, 70, ${d.life * 0.35})`;
           ctx.beginPath();
-          ctx.arc(d.x, cy + d.y, 1.5 + (1 - d.life) * 2, 0, Math.PI * 2);
+          ctx.arc(d.x, d.y, 1.5 + (1 - d.life) * 2, 0, Math.PI * 2);
           ctx.fill();
         }
 
-        drawRoach(ctx, cx, cy, {
+        // сам таракан, повёрнутый по ходу трассы
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.angle);
+        drawRoach(ctx, 0, 0, {
           color: r.color,
           number: r.number,
           phase: r.phase,
           twitch: r.twitch,
           moving: r.moving > 0.05 ? 1 : 0,
-          scale: this.narrow ? 0.9 : 1.15,
+          scale: L.roachScale,
         });
+        ctx.restore();
 
-        // место на финише
+        // ник над тараканом (горизонтально, с обводкой для читаемости)
+        if (!L.narrow) {
+          ctx.font = (isYou ? '600 ' : '400 ') + '12px "Golos Text", system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          const label = this.fit(ctx, isYou ? r.nick + ' (ты)' : r.nick, 120);
+          const ly = p.y - 20;
+          ctx.lineWidth = 3;
+          ctx.strokeStyle = 'rgba(228, 220, 203, 0.9)';
+          ctx.strokeText(label, p.x, ly);
+          ctx.fillStyle = isYou ? '#16302a' : 'rgba(22, 48, 42, 0.8)';
+          ctx.fillText(label, p.x, ly);
+        }
+
+        // медаль за место на финише
         if (r.place && !r.dnf) {
-          const bx = L.finishX + 12 + (this.narrow ? 10 : 16);
+          const my = p.y - (L.narrow ? 16 : 22);
           ctx.fillStyle = MEDALS[r.place] || '#8a9a92';
           ctx.beginPath();
-          ctx.arc(bx, cy, this.narrow ? 10 : 13, 0, Math.PI * 2);
+          ctx.arc(p.x, my, L.narrow ? 9 : 12, 0, Math.PI * 2);
           ctx.fill();
           ctx.fillStyle = PAL.ink;
           ctx.font = '800 11px "Unbounded", "Arial Black", sans-serif';
           ctx.textAlign = 'center';
-          ctx.fillText(String(r.place), bx, cy + 0.5);
+          ctx.fillText(String(r.place), p.x, my + 0.5);
         }
       }
+    }
+
+    roundRect(ctx, x, y, w, h, r) {
+      r = Math.max(0, Math.min(r, Math.min(w, h) / 2));
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y, x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x, y + h, r);
+      ctx.arcTo(x, y + h, x, y, r);
+      ctx.arcTo(x, y, x + w, y, r);
+      ctx.closePath();
     }
 
     fit(ctx, text, maxW) {

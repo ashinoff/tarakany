@@ -2,7 +2,34 @@
   'use strict';
 
   const $ = (id) => document.getElementById(id);
-  const MAX_WRONG = 8; // сколько неверных символов можно набрать подряд, прежде чем ввод "упрётся"
+
+  // Комичные кричалки: меняются от заезда к заезду.
+  const QUIPS = [
+    'Кто последний — тот под тапком!',
+    'Тараканы на старте, нервишки — вразнос.',
+    'Беги, рыжий, беги, пока свет не включили!',
+    'Промахнулся по клавише — считай, уже на тапке.',
+    'Усами не маши — пальцами работай.',
+    'Медленный таракан — сытый кот.',
+    'На кухне погаснет свет — победит самый быстрый.',
+    'Опечатка — и ты уже закуска.',
+    'Спринт по плинтусу: орфография решает.',
+    'Шурши клавишами, а не тараканьими лапками.',
+    'Кто не успел — того веником.',
+    'Дихлофос уже близко, набирай быстрее!',
+    'Чемпион кухни получает хлебную крошку.',
+    'Бежим за печеньком, остальное — суета.',
+    'Один неверный знак — и привет, мухобойка.',
+    'Тараканьи бега: тут выживает самый грамотный.',
+  ];
+  let lastQuip = -1;
+  function newQuip() {
+    let i = lastQuip;
+    while (QUIPS.length > 1 && i === lastQuip) i = Math.floor(Math.random() * QUIPS.length);
+    lastQuip = i;
+    const q = $('quip');
+    if (q) q.textContent = QUIPS[i];
+  }
 
   const store = {
     get(k) {
@@ -19,6 +46,7 @@
   // ---------- Состояние ----------
   const socket = io();
   const track = new window.Track($('track'));
+  track.ring = $('ringInner'); // панель со счётом и текстом в центре кольца
   window.RoachArt.startHeroRoach($('hero'));
 
   let me = { id: null, nick: '' };
@@ -29,7 +57,7 @@
   // набор текста
   let text = '';
   let pos = 0;
-  let wrong = '';
+  let errAt = false; // на текущей букве стоит ошибка: таракан замер, пока не нажмут верную
   let errors = 0;
   let raceStartAt = 0;
   let lastSentPos = 0;
@@ -180,6 +208,7 @@
 
     renderHeader();
     renderPanels();
+    renderStandings();
     renderSpectators();
     renderText();
     updateStats();
@@ -191,9 +220,10 @@
     raceStartAt = s.startAt;
     text = s.text;
     pos = 0;
-    wrong = '';
+    errAt = false;
     errors = 0;
     lastSentPos = 0;
+    newQuip();
     track.resetPositions();
     setHint('');
     focusInput();
@@ -202,7 +232,7 @@
   function resetTyping() {
     text = '';
     pos = 0;
-    wrong = '';
+    errAt = false;
     errors = 0;
     raceStartAt = 0;
     lastSentPos = 0;
@@ -227,28 +257,33 @@
   function onChar(ch) {
     if (!canType()) return;
     const expected = text[pos];
-    if (!wrong && same(ch, expected)) {
+    if (same(ch, expected)) {
+      // верная буква - таракан делает шаг, ошибка (если была) снимается
       pos++;
+      errAt = false;
       setHint('');
       track.setProgress(me.id, pos);
       sendProgress();
     } else {
-      if (wrong.length < MAX_WRONG) {
-        wrong += ch;
-        errors++;
+      // неверная буква - курсор НЕ двигается, стоит на той же букве, пока не нажмут верную
+      if (!errAt) {
+        errAt = true;
+        errors++; // одна буква - одна ошибка, сколько ни долби мимо
       }
       if (isLatin(ch) && isCyrillic(expected)) setHint('Похоже, включена английская раскладка. Переключись на русскую.');
-      else if (wrong.length >= MAX_WRONG) setHint('Сотри ошибку клавишей Backspace, чтобы бежать дальше.');
+      else setHint('Не та буква - таракан замер. Нажми правильную, чтобы бежать дальше.');
       shake();
     }
     renderText();
     updateStats();
   }
 
-  function onBackspace(all) {
-    if (!wrong) return;
-    wrong = all ? '' : wrong.slice(0, -1);
-    if (!wrong) setHint('');
+  function onBackspace() {
+    // отдельно стирать ничего не нужно: курсор и так ждёт верную букву.
+    // Backspace просто гасит красную подсветку, если захотелось "передохнуть".
+    if (!errAt) return;
+    errAt = false;
+    setHint('');
     renderText();
   }
 
@@ -339,15 +374,12 @@
       return;
     }
 
-    const errEnd = Math.min(text.length, pos + wrong.length);
     const done = text.slice(0, pos);
-    const err = text.slice(pos, errEnd);
-    const cur = errEnd < text.length ? text[errEnd] : '';
-    const rest = text.slice(errEnd + 1);
+    const cur = pos < text.length ? text[pos] : '';
+    const rest = text.slice(pos + 1);
     box.innerHTML =
       `<span class="t-done">${escapeHtml(done)}</span>` +
-      (err ? `<span class="t-err">${escapeHtml(err)}</span>` : '') +
-      (cur ? `<span class="t-cur${wrong ? ' after-err' : ''}">${escapeHtml(cur)}</span>` : '') +
+      (cur ? `<span class="t-cur${errAt ? ' error' : ''}">${escapeHtml(cur)}</span>` : '') +
       `<span class="t-rest">${escapeHtml(rest)}</span>`;
   }
 
@@ -489,7 +521,38 @@
     $('statTime').textContent = formatTime(elapsed);
     const progress = text ? Math.round((100 * pos) / text.length) : 0;
     $('statProgress').textContent = progress;
-    $('statPlace').textContent = mine && mine.finished && !mine.dnf ? `Финиш! Место: ${mine.place}` : '';
+  }
+
+  // Таблица мест слева в центре кольца: кто где едет / финишировал.
+  function renderStandings() {
+    const el = $('standingsList');
+    if (!el) return;
+    if (!room) { el.innerHTML = ''; return; }
+    const waiting = room.state === 'waiting';
+    const racing = room.state === 'racing' || room.state === 'countdown';
+    const players = waiting ? room.players.slice() : room.players.filter((p) => !p.spectator);
+    const len = room.text ? room.text.length : (text ? text.length : 1);
+
+    if (racing) players.sort((a, b) => (b.progress || 0) - (a.progress || 0));
+    else if (room.state === 'finished') players.sort((a, b) => (a.place || 99) - (b.place || 99));
+
+    el.innerHTML = players
+      .map((p, i) => {
+        const you = p.id === me.id;
+        let val = '';
+        if (racing) val = Math.round((100 * (p.progress || 0)) / Math.max(1, len)) + '%';
+        else if (room.state === 'finished') val = p.dnf ? 'сошёл' : (p.place ? '#' + p.place : '');
+        const rank = waiting ? '🪳' : i + 1;
+        return (
+          `<li class="${you ? 'you' : ''}">` +
+          `<span class="s-rank">${rank}</span>` +
+          `<span class="s-dot" style="background:${p.color}"></span>` +
+          `<span class="s-nick">${escapeHtml(p.nick)}${you ? ' <em>ты</em>' : ''}</span>` +
+          `<span class="s-val">${val}</span>` +
+          `</li>`
+        );
+      })
+      .join('');
   }
 
   // таймеры обратного отсчёта
@@ -515,7 +578,10 @@
         if (now - room.startAt > 700) $('overlay').hidden = true;
       }
     }
-    if (room.state === 'racing') updateStats();
+    if (room.state === 'racing') {
+      updateStats();
+      renderStandings();
+    }
   }
   setInterval(tickUi, 100);
 })();

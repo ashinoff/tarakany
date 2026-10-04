@@ -192,51 +192,215 @@ p { margin: 0; }
   gap: 16px;
   min-height: 60px;
   flex-wrap: wrap;
-  padding-top: 8px;
-  padding-bottom: 8px;
+  padding: 10px 16px;
 }
-.brand { font: 800 17px var(--font-display); letter-spacing: -0.02em; color: #fff; }
-.room-label { font-size: 15px; flex: 1; min-width: 12em; }
+.brand { font: 800 18px var(--font-display); letter-spacing: -0.02em; color: #fff; }
+.brand-sub {
+  font: 500 13px var(--font-body);
+  letter-spacing: 0;
+  color: var(--yolk);
+  margin-left: 6px;
+}
+.room-label { font-size: 15px; flex: 1; min-width: 10em; }
+.timer {
+  font-size: 14px;
+  color: var(--on-wall);
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  padding: 6px 12px;
+}
+.timer b {
+  font: 700 18px var(--font-display);
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+  margin-left: 4px;
+}
 .topbar-actions { display: flex; gap: 8px; }
 
-.race-body { padding-top: 22px; padding-bottom: 48px; }
+/* комичная кричалка, меняется каждый заезд */
+.quip {
+  text-align: center;
+  font: 600 clamp(15px, 2.2vw, 22px) var(--font-display);
+  letter-spacing: -0.01em;
+  color: var(--yolk);
+  padding: 12px 16px 2px;
+  min-height: 1.4em;
+}
 
-.track-wrap {
+/* ---------- Кольцевой стадион ---------- */
+.race-stage {
   position: relative;
+  margin: 10px 10px 4px;
+  height: clamp(460px, 74vh, 860px);
   border: 3px solid var(--wall-deep);
   border-radius: var(--radius);
   overflow: hidden;
   box-shadow: var(--plate-shadow);
   background: #e4dccb;
 }
-#track { display: block; width: 100%; }
+#track {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
 
-.overlay {
+/* то, что стоит в "поле" внутри кольца; inset выставляет track.js по геометрии трассы */
+.ring-inner {
+  position: absolute;
+  inset: 140px;
+  display: flex;
+  gap: 16px;
+  min-height: 0;
+}
+
+/* табло мест слева */
+.standings {
+  width: clamp(170px, 24%, 250px);
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  background: rgba(21, 48, 42, 0.92);
+  color: var(--on-wall);
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 12px 12px 10px;
+  min-height: 0;
+}
+.standings-title {
+  margin: 0 0 8px;
+  font: 700 15px var(--font-display);
+  letter-spacing: -0.01em;
+  color: #fff;
+}
+.standings-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+.standings-list li {
+  display: grid;
+  grid-template-columns: 1.4em 12px 1fr auto;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 2px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 14px;
+}
+.standings-list li.you { background: rgba(240, 180, 41, 0.16); border-radius: 6px; }
+.s-rank { font: 700 13px var(--font-display); color: var(--yolk); text-align: center; }
+.s-dot { width: 12px; height: 12px; border-radius: 50%; }
+.s-nick { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.s-nick em { font-style: normal; color: var(--yolk); font-size: 12px; }
+.s-val { font-variant-numeric: tabular-nums; font-weight: 600; color: #fff; }
+
+.my-stats {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 2px solid rgba(255, 255, 255, 0.12);
+}
+.my-stats .stat {
+  flex: 1;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.my-stats .stat b {
+  font: 700 20px var(--font-display);
+  color: #fff;
+  font-variant-numeric: tabular-nums;
+}
+.my-stats .stat span { font-size: 11px; color: var(--on-wall); line-height: 1.1; }
+
+/* правая часть поля: текст или табло лобби/результатов */
+.center-main { flex: 1; min-width: 0; display: flex; }
+#typing, #board { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+
+/* набор текста */
+.typing { position: relative; }
+.text-box {
+  position: relative;
+  flex: 1;
+  overflow-y: auto;
+  background: var(--enamel);
+  border: 3px solid var(--wall-deep);
+  border-radius: 12px;
+  box-shadow: var(--plate-shadow);
+  padding: 22px 26px;
+  font: 400 clamp(19px, 2.1vw, 26px)/1.7 var(--font-type);
+  color: var(--ink);
+  cursor: text;
+  word-break: break-word;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.text-box.focused { border-color: var(--ink); }
+.text-box.placeholder { color: #7b8a83; font-family: var(--font-body); font-size: 17px; display: grid; place-items: center; text-align: center; }
+.text-box.waiting { color: #8b9993; }
+.text-box.spectator { color: #8b9993; }
+
+.t-done { color: var(--done); }
+/* обычный курсор: синий фон, белый текст - хорошо виден */
+.t-cur {
+  background: #2f6df6;
+  color: #fff;
+  border-radius: 3px;
+  box-shadow: 0 3px 0 #16305e;
+}
+/* ошибка: красный фон, белый текст; курсор стоит на месте, пока не нажмут верную букву */
+.t-cur.error {
+  background: var(--brick);
+  color: #fff;
+  box-shadow: 0 3px 0 #7a2015;
+}
+
+/* подсказка, если поле ввода потеряло фокус посреди заезда */
+.typing:not(:has(.text-box.focused)) .text-box:not(.placeholder):not(.spectator)::after {
+  content: "Нажми на текст, чтобы печатать";
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
-  background: rgba(22, 48, 42, 0.35);
-  pointer-events: none;
-}
-.count {
-  font: 800 clamp(64px, 14vw, 140px)/1 var(--font-display);
-  color: var(--yolk);
-  -webkit-text-stroke: 3px var(--ink);
-  paint-order: stroke fill;
-  text-shadow: 0 6px 0 var(--ink);
-  letter-spacing: -0.03em;
-}
-.count.pop { animation: pop 0.35s ease-out; }
-@keyframes pop {
-  from { transform: scale(1.35); opacity: 0.4; }
-  to { transform: scale(1); opacity: 1; }
+  background: rgba(251, 250, 245, 0.88);
+  border-radius: 10px;
+  font: 600 16px var(--font-display);
+  color: var(--ink);
 }
 
-.spectators { color: var(--on-wall); font-size: 14px; min-height: 1.5em; margin: 10px 2px 6px; }
+.text-box.shake { animation: shake 0.18s linear; }
+@keyframes shake {
+  25% { transform: translateX(-3px); }
+  75% { transform: translateX(3px); }
+}
 
-/* табло: лобби и результаты */
-.board { padding: 22px 24px; }
+/* настоящее поле ввода прячем под текстом (нужно для мобильной клавиатуры) */
+.type-input {
+  position: absolute;
+  left: 0; top: 0;
+  width: 1px; height: 1px;
+  opacity: 0;
+  border: 0; padding: 0;
+  font-size: 16px; /* иначе iOS зумит страницу */
+}
+
+.hint { margin-top: 10px; color: var(--yolk); font-weight: 500; min-height: 1.5em; text-align: center; }
+
+/* табло: лобби и результаты - внутри поля, на месте текста */
+.board {
+  overflow-y: auto;
+  background: var(--enamel);
+  border: 3px solid var(--wall-deep);
+  border-radius: 12px;
+  box-shadow: var(--plate-shadow);
+  padding: 22px 24px;
+}
 .board h2 { font: 600 22px var(--font-display); letter-spacing: -0.02em; margin-bottom: 8px; }
 .board p { max-width: 60ch; }
 .board .muted { color: #5d6f68; }
@@ -269,82 +433,30 @@ p { margin: 0; }
   font: 800 12px var(--font-display);
 }
 
-/* набор текста */
-.typing { position: relative; }
-.text-box {
-  position: relative;
-  background: var(--enamel);
-  border: 3px solid var(--wall-deep);
-  border-radius: var(--radius);
-  box-shadow: var(--plate-shadow);
-  padding: 22px 26px;
-  font: 400 22px/1.7 var(--font-type);
-  color: var(--ink);
-  min-height: 150px;
-  cursor: text;
-  word-break: break-word;
-  user-select: none;
-  -webkit-user-select: none;
-}
-.text-box.focused { border-color: var(--ink); }
-.text-box.placeholder { color: #7b8a83; font-family: var(--font-body); font-size: 17px; }
-.text-box.waiting { color: #8b9993; }
-.text-box.spectator { color: #8b9993; }
-
-.t-done { color: var(--done); }
-.t-err { background: var(--brick); color: #fff; border-radius: 3px; }
-.t-cur {
-  background: var(--yolk);
-  border-radius: 3px;
-  box-shadow: 0 3px 0 var(--ink);
-}
-.t-cur.after-err { background: #f6d9d3; box-shadow: none; }
-
-/* подсказка, если поле ввода потеряло фокус посреди заезда */
-.typing:not(:has(.text-box.focused)) .text-box:not(.placeholder):not(.spectator)::after {
-  content: "Нажми на текст, чтобы печатать";
+/* большой обратный отсчёт поверх стадиона */
+.overlay {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
-  background: rgba(251, 250, 245, 0.88);
-  border-radius: calc(var(--radius) - 3px);
-  font: 600 16px var(--font-display);
-  color: var(--ink);
+  background: rgba(22, 48, 42, 0.35);
+  pointer-events: none;
+}
+.count {
+  font: 800 clamp(64px, 14vw, 150px)/1 var(--font-display);
+  color: var(--yolk);
+  -webkit-text-stroke: 3px var(--ink);
+  paint-order: stroke fill;
+  text-shadow: 0 6px 0 var(--ink);
+  letter-spacing: -0.03em;
+}
+.count.pop { animation: pop 0.35s ease-out; }
+@keyframes pop {
+  from { transform: scale(1.35); opacity: 0.4; }
+  to { transform: scale(1); opacity: 1; }
 }
 
-.text-box.shake { animation: shake 0.18s linear; }
-@keyframes shake {
-  25% { transform: translateX(-3px); }
-  75% { transform: translateX(3px); }
-}
-
-/* настоящее поле ввода прячем под текстом (нужно для мобильной клавиатуры) */
-.type-input {
-  position: absolute;
-  left: 0; top: 0;
-  width: 1px; height: 1px;
-  opacity: 0;
-  border: 0; padding: 0;
-  font-size: 16px; /* иначе iOS зумит страницу */
-}
-
-.stats {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 26px;
-  margin-top: 18px;
-  color: var(--on-wall);
-  font-size: 15px;
-  align-items: baseline;
-}
-.stats b {
-  font: 600 20px var(--font-display);
-  color: #fff;
-  font-variant-numeric: tabular-nums;
-}
-.place-note { color: var(--yolk); font-weight: 600; }
-.hint { margin-top: 10px; color: var(--yolk); font-weight: 500; min-height: 1.5em; }
+.spectators { color: var(--on-wall); font-size: 14px; min-height: 1.5em; margin: 6px 12px; text-align: center; }
 
 .offline {
   position: fixed;
@@ -365,16 +477,19 @@ p { margin: 0; }
   .whitewash { padding-top: calc(36px + env(safe-area-inset-top, 0px)); }
   .lead { font-size: 17px; }
   .wrap { padding: 0 14px; }
-  .text-box { font-size: 18px; padding: 16px 18px; min-height: 120px; }
-  .brand { display: none; }
-  .room-label { font-size: 14px; }
-  .board { padding: 18px; }
+  .brand-sub { display: none; }
+  .room-label { font-size: 13px; min-width: 0; }
+  .race-stage { height: clamp(520px, 80vh, 900px); margin: 8px 6px 4px; }
+  .ring-inner { flex-direction: column; gap: 10px; }
+  .standings { width: auto; flex: none; max-height: 34%; }
+  .standings-list { font-size: 13px; }
+  .my-stats .stat b { font-size: 17px; }
+  .text-box { font-size: 18px; padding: 14px 16px; }
+  .board { padding: 16px; }
   .board table { font-size: 14px; }
   .board th, .board td { padding-right: 8px; }
   .place { width: 24px; height: 24px; font-size: 11px; }
-  .stats { gap: 6px 18px; }
-  .topbar-inner { padding-top: 12px; padding-bottom: 12px; gap: 10px; }
-  .race-body { padding-top: 16px; }
+  .topbar-inner { padding: 10px 12px; gap: 10px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

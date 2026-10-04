@@ -55,9 +55,10 @@
   <!-- ===== Заезд ===== -->
   <main id="race" class="screen" hidden>
     <header class="topbar">
-      <div class="wrap topbar-inner">
-        <span class="brand">Тараканьи бега</span>
+      <div class="topbar-inner">
+        <span class="brand">Тараканьи бега <span class="brand-sub">кто последний — тот под тапком</span></span>
         <span id="roomLabel" class="room-label"></span>
+        <span class="timer">время <b id="statTime">0:00</b></span>
         <span class="topbar-actions">
           <button type="button" id="copyLink" class="btn small" hidden>Скопировать ссылку</button>
           <button type="button" id="leaveBtn" class="btn small ghost">Выйти</button>
@@ -65,29 +66,38 @@
       </div>
     </header>
 
-    <div class="wrap race-body">
-      <section class="track-wrap" aria-label="Трасса">
-        <canvas id="track"></canvas>
-        <div id="overlay" class="overlay" hidden></div>
-      </section>
-      <p id="spectators" class="spectators"></p>
+    <p id="quip" class="quip" role="status"></p>
 
-      <section id="board" class="enamel board" aria-live="polite"></section>
+    <div class="race-stage" aria-label="Трасса">
+      <canvas id="track"></canvas>
 
-      <section id="typing" class="typing" hidden>
-        <div id="textBox" class="text-box placeholder"></div>
-        <input id="typeInput" class="type-input" type="text" aria-label="Набирай текст здесь"
-               autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="next">
-        <div class="stats">
-          <span><b id="statSpeed">0</b> зн/мин</span>
-          <span>точность <b id="statAcc">100</b>%</span>
-          <span>пройдено <b id="statProgress">0</b>%</span>
-          <span>время <b id="statTime">0:00</b></span>
-          <span id="statPlace" class="place-note"></span>
+      <div id="ringInner" class="ring-inner">
+        <aside class="standings" aria-label="Таблица мест">
+          <h3 class="standings-title">Табло</h3>
+          <ol id="standingsList" class="standings-list"></ol>
+          <div class="my-stats">
+            <div class="stat"><b id="statSpeed">0</b><span>зн/мин</span></div>
+            <div class="stat"><b id="statAcc">100</b><span>точность %</span></div>
+            <div class="stat"><b id="statProgress">0</b><span>пройдено %</span></div>
+          </div>
+        </aside>
+
+        <div class="center-main">
+          <section id="typing" class="typing" hidden>
+            <div id="textBox" class="text-box placeholder"></div>
+            <input id="typeInput" class="type-input" type="text" aria-label="Набирай текст здесь"
+                   autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="next">
+            <p id="hint" class="hint" role="status"></p>
+          </section>
+
+          <section id="board" class="board" aria-live="polite"></section>
         </div>
-        <p id="hint" class="hint" role="status"></p>
-      </section>
+      </div>
+
+      <div id="overlay" class="overlay" hidden></div>
     </div>
+
+    <p id="spectators" class="spectators"></p>
 
     <div id="offline" class="offline" role="alert" hidden>Связь с сервером пропала. Переподключаемся…</div>
   </main>
