@@ -18,9 +18,11 @@
     pronotum: '#7b4a2a',
     rim: '#b07b4c',
     head: '#2b190e',
+    stands: '#17231e',
   };
 
   const MEDALS = { 1: '#f0b429', 2: '#c9ced3', 3: '#c98b4e' };
+  const FAN_COLORS = ['#d64532', '#2f6fde', '#e3a512', '#2f9e63', '#8d4bc4', '#e2702c', '#14a0a0', '#d6457a', '#c0607a', '#5a8f3a'];
 
   // ---------- Таракан ----------
   // cx, cy - центр тела, смотрит вправо. phase - фаза шага, twitch - фаза усов.
@@ -142,6 +144,147 @@
     ctx.restore();
   }
 
+  // ---------- Мир тараканов: болельщики, чирлидерши, репортёры ----------
+  // Болельщик на трибуне: круглая мордашка с усами и глазками, слегка подпрыгивает.
+  function drawFan(ctx, x, y, color, bob, scale) {
+    ctx.save();
+    ctx.translate(x, y + bob);
+    ctx.scale(scale, scale);
+    ctx.strokeStyle = 'rgba(30, 18, 8, 0.8)';
+    ctx.lineWidth = 1.1;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-2.5, -4);
+    ctx.quadraticCurveTo(-6, -10, -7.5, -13);
+    ctx.moveTo(2.5, -4);
+    ctx.quadraticCurveTo(6, -10, 7.5, -13);
+    ctx.stroke();
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 6.5, 7.5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.18)';
+    ctx.beginPath();
+    ctx.ellipse(-2, -2.5, 2.5, 1.6, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(-2.4, -1, 1.5, 0, Math.PI * 2);
+    ctx.arc(2.4, -1, 1.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#16302a';
+    ctx.beginPath();
+    ctx.arc(-2.4, -0.7, 0.8, 0, Math.PI * 2);
+    ctx.arc(2.4, -0.7, 0.8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // Чирлидерша-тараканша: юбочка и два помпона, которыми машет в такт.
+  function drawCheer(ctx, x, y, t, color, scale) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(scale, scale);
+    const wave = Math.sin(t * 7) * 0.6;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(-6, 4);
+    ctx.lineTo(6, 4);
+    ctx.lineTo(3.5, 10);
+    ctx.lineTo(-3.5, 10);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#6a3d22';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 5.5, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(30, 18, 8, 0.85)';
+    ctx.lineWidth = 1;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-2, -5);
+    ctx.lineTo(-4, -11);
+    ctx.moveTo(2, -5);
+    ctx.lineTo(4, -11);
+    ctx.stroke();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(-2, -2, 1.4, 0, Math.PI * 2);
+    ctx.arc(2, -2, 1.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#16302a';
+    ctx.beginPath();
+    ctx.arc(-2, -1.8, 0.7, 0, Math.PI * 2);
+    ctx.arc(2, -1.8, 0.7, 0, Math.PI * 2);
+    ctx.fill();
+    for (const sgn of [-1, 1]) {
+      ctx.save();
+      ctx.translate(sgn * 5, -1);
+      ctx.rotate(sgn * (0.5 + wave));
+      ctx.strokeStyle = '#6a3d22';
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(sgn * 3, -6);
+      ctx.stroke();
+      const px = sgn * 4;
+      const py = -8;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1;
+      for (let a = 0; a < Math.PI * 2; a += Math.PI / 5) {
+        ctx.beginPath();
+        ctx.moveTo(px, py);
+        ctx.lineTo(px + Math.cos(a) * 3.2, py + Math.sin(a) * 3.2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  // Репортёр-таракан с камерой на плече (с мигающей красной точкой записи).
+  function drawReporter(ctx, x, y, scale, flip) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(flip ? -scale : scale, scale);
+    ctx.fillStyle = '#3f2414';
+    ctx.beginPath();
+    ctx.ellipse(-1, 1, 5.5, 7, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(30, 18, 8, 0.85)';
+    ctx.lineWidth = 1;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(-3, -5);
+    ctx.lineTo(-5, -11);
+    ctx.moveTo(0, -6);
+    ctx.lineTo(1, -12);
+    ctx.stroke();
+    ctx.fillStyle = '#111';
+    ctx.fillRect(2, -7, 9, 7);
+    ctx.fillStyle = '#333';
+    ctx.beginPath();
+    ctx.arc(11.5, -3.5, 2.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#9fe0ff';
+    ctx.beginPath();
+    ctx.arc(11.5, -3.5, 1.1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#e23';
+    ctx.beginPath();
+    ctx.arc(3.5, -8.2, 0.9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.arc(-1, -2, 1.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#16302a';
+    ctx.beginPath();
+    ctx.arc(-0.6, -2, 0.6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
   // ---------- Трасса (кольцо) ----------
   class Track {
     constructor(canvas) {
@@ -172,25 +315,26 @@
       const W = this.cssW;
       const H = this.cssH;
       const narrow = this.narrow;
-      const pad = narrow ? 6 : 10;
+      const stand = narrow ? 16 : 30; // ширина трибун по краю (там болельщики)
+      const pad = stand; // трасса начинается сразу за трибунами
       const lanes = Math.max(3, this.order.length);
       const minSide = Math.min(W, H);
       const band = narrow
-        ? Math.min(Math.max(44, minSide * 0.18), 92)
-        : Math.min(Math.max(92, minSide * 0.17), 150);
+        ? Math.min(Math.max(48, minSide * 0.17), 92)
+        : Math.min(Math.max(96, minSide * 0.16), 150); // чуть шире прежнего, но поле в центре сохраняем
       const edge = narrow ? 8 : 12; // от края трассы до первой дорожки
       const laneSpan = Math.max(1, band - edge - 6);
       const gap = laneSpan / lanes;
-      const corner = narrow ? 22 : 42;
-      const roachScale = narrow ? 0.6 : 0.95;
+      const corner = narrow ? 22 : 46;
+      const roachScale = narrow ? 0.62 : 1.0;
       const baseInset = pad + edge; // центр дорожки i = baseInset + (i + 0.5) * gap
       const infieldInset = pad + band; // внутренний край трассы = начало поля
-      return { W, H, narrow, pad, lanes, band, gap, corner, roachScale, baseInset, infieldInset };
+      return { W, H, narrow, stand, pad, lanes, band, gap, corner, roachScale, baseInset, infieldInset };
     }
 
     // Замкнутая дорожка - скруглённый прямоугольник, вставленный на inset от краёв.
-    // at(f) по доле пути [0..1) даёт точку и угол направления движения (против часовой,
-    // старт в середине нижней стороны, таракан сперва бежит вправо).
+    // at(f) по доле пути [0..1) даёт точку и угол направления движения (ПО ЧАСОВОЙ,
+    // старт в середине ВЕРХНЕЙ стороны, таракан сперва бежит вправо).
     makeLoop(inset, L) {
       const x = inset;
       const y = inset;
@@ -214,17 +358,17 @@
           },
         });
       };
-      straight(x + r, y + h, x + w - r, y + h); // низ, вправо
-      arc(x + w - r, y + h - r, Math.PI / 2, 0); // угол справа снизу
-      straight(x + w, y + h - r, x + w, y + r); // право, вверх
-      arc(x + w - r, y + r, 0, -Math.PI / 2); // угол справа сверху
-      straight(x + w - r, y, x + r, y); // верх, влево
-      arc(x + r, y + r, -Math.PI / 2, -Math.PI); // угол слева сверху
-      straight(x, y + r, x, y + h - r); // лево, вниз
-      arc(x + r, y + h - r, Math.PI, Math.PI / 2); // угол слева снизу
+      straight(x + r, y, x + w - r, y); // верх, вправо
+      arc(x + w - r, y + r, -Math.PI / 2, 0); // угол справа сверху
+      straight(x + w, y + r, x + w, y + h - r); // право, вниз
+      arc(x + w - r, y + h - r, 0, Math.PI / 2); // угол справа снизу
+      straight(x + w - r, y + h, x + r, y + h); // низ, влево
+      arc(x + r, y + h - r, Math.PI / 2, Math.PI); // угол слева снизу
+      straight(x, y + h - r, x, y + r); // лево, вверх
+      arc(x + r, y + r, Math.PI, 1.5 * Math.PI); // угол слева сверху
 
       const total = segs.reduce((s, g) => s + g.len, 0) || 1;
-      const startDist = Math.max(0, w / 2 - r); // f = 0 в середине нижней стороны
+      const startDist = Math.max(0, w / 2 - r); // f = 0 в середине верхней стороны
       const raw = (dist) => {
         let d = ((dist % total) + total) % total;
         for (const g of segs) {
@@ -333,6 +477,7 @@
     frame(t) {
       const dt = Math.min(0.05, (t - this.last) / 1000);
       this.last = t;
+      this.clock = (this.clock || 0) + dt;
 
       for (const r of this.racers.values()) {
         const loop = this.loops[r.lane] || this.loops[0];
@@ -376,17 +521,22 @@
       const W = L.W;
       const H = L.H;
 
-      // покрытие (плитка) на всё поле
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.fillStyle = this.tilePattern || PAL.tileA;
-      ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-      ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+      const t = this.clock || 0;
 
-      // внешняя рамка трассы
+      // фон-трибуны на весь холст + толпа болельщиков по краю
+      ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+      ctx.fillStyle = PAL.stands;
+      ctx.fillRect(0, 0, W, H);
+      this.drawCrowd(L, t);
+
+      // всё ниже рисуем внутри внешнего скругления трассы
+      ctx.save();
       this.roundRect(ctx, L.pad, L.pad, W - 2 * L.pad, H - 2 * L.pad, L.corner + 6);
-      ctx.strokeStyle = 'rgba(22, 48, 42, 0.55)';
-      ctx.lineWidth = 3;
-      ctx.stroke();
+      ctx.clip();
+
+      // покрытие (плитка)
+      ctx.fillStyle = this.tilePattern || PAL.tileA;
+      ctx.fillRect(L.pad, L.pad, W - 2 * L.pad, H - 2 * L.pad);
 
       // подсветка твоей дорожки (широкая мягкая лента)
       const you = this.racers.get(this.youId);
@@ -417,13 +567,21 @@
       ctx.lineWidth = 2;
       ctx.stroke();
 
-      // старт/финиш - шахматка поперёк нижней стороны по центру
+      // старт/финиш - шахматка поперёк ВЕРХНЕЙ стороны по центру
       const sq = 7;
       const sx = W / 2;
-      for (let yy = H - ii, row = 0; yy < H - L.pad; yy += sq, row++) {
+      for (let yy = L.pad, row = 0; yy < ii; yy += sq, row++) {
         ctx.fillStyle = row % 2 ? '#16302a' : '#fbfaf5';
-        ctx.fillRect(sx - 4, yy, 8, Math.min(sq, H - L.pad - yy));
+        ctx.fillRect(sx - 4, yy, 8, Math.min(sq, ii - yy));
       }
+
+      ctx.restore(); // снимаем клип трассы
+
+      // бортик трассы поверх покрытия
+      this.roundRect(ctx, L.pad, L.pad, W - 2 * L.pad, H - 2 * L.pad, L.corner + 6);
+      ctx.strokeStyle = '#16302a';
+      ctx.lineWidth = 4;
+      ctx.stroke();
 
       // тараканы
       ctx.textBaseline = 'middle';
@@ -457,32 +615,70 @@
         });
         ctx.restore();
 
-        // ник над тараканом (горизонтально, с обводкой для читаемости)
+        // ник и медаль смещаем к центру поля, чтобы не лезли в трибуны
+        const tdx = W / 2 - p.x;
+        const tdy = H / 2 - p.y;
+        const tl = Math.hypot(tdx, tdy) || 1;
+        const off = L.narrow ? 15 : 21;
+        const lx = p.x + (tdx / tl) * off;
+        const ly = p.y + (tdy / tl) * off;
+
+        // ник у таракана (горизонтально, с обводкой для читаемости)
         if (!L.narrow) {
           ctx.font = (isYou ? '600 ' : '400 ') + '12px "Golos Text", system-ui, sans-serif';
           ctx.textAlign = 'center';
           const label = this.fit(ctx, isYou ? r.nick + ' (ты)' : r.nick, 120);
-          const ly = p.y - 20;
           ctx.lineWidth = 3;
           ctx.strokeStyle = 'rgba(228, 220, 203, 0.9)';
-          ctx.strokeText(label, p.x, ly);
+          ctx.strokeText(label, lx, ly);
           ctx.fillStyle = isYou ? '#16302a' : 'rgba(22, 48, 42, 0.8)';
-          ctx.fillText(label, p.x, ly);
+          ctx.fillText(label, lx, ly);
         }
 
         // медаль за место на финише
         if (r.place && !r.dnf) {
-          const my = p.y - (L.narrow ? 16 : 22);
+          const mx = p.x + (tdx / tl) * (off + 6);
+          const my = p.y + (tdy / tl) * (off + 6);
           ctx.fillStyle = MEDALS[r.place] || '#8a9a92';
           ctx.beginPath();
-          ctx.arc(p.x, my, L.narrow ? 9 : 12, 0, Math.PI * 2);
+          ctx.arc(mx, my, L.narrow ? 9 : 12, 0, Math.PI * 2);
           ctx.fill();
           ctx.fillStyle = PAL.ink;
           ctx.font = '800 11px "Unbounded", "Arial Black", sans-serif';
           ctx.textAlign = 'center';
-          ctx.fillText(String(r.place), p.x, my + 0.5);
+          ctx.fillText(String(r.place), mx, my + 0.5);
         }
       }
+    }
+
+    // Трибуны: ряды болельщиков по четырём сторонам + чирлидерши у старта и репортёры снизу.
+    drawCrowd(L, t) {
+      const ctx = this.ctx;
+      const W = L.W;
+      const H = L.H;
+      const s = L.stand;
+      const mid = s * 0.52;
+      const step = L.narrow ? 15 : 20;
+      const fscale = s / 20;
+      let i = 0;
+      const fan = (x, y) => {
+        drawFan(ctx, x, y, FAN_COLORS[i % FAN_COLORS.length], Math.sin(t * 5 + i * 0.7) * 2, fscale);
+        i++;
+      };
+      for (let x = s + step / 2; x < W - s; x += step) fan(x, mid); // верх
+      for (let x = s + step / 2; x < W - s; x += step) fan(x, H - mid); // низ
+      for (let y = s + step / 2; y < H - s; y += step) fan(mid, y); // лево
+      for (let y = s + step / 2; y < H - s; y += step) fan(W - mid, y); // право
+
+      // чирлидерши по бокам от старта (сверху по центру)
+      const cx = L.narrow ? 32 : 58;
+      drawCheer(ctx, W / 2 - cx, mid, t, '#ff5fa2', fscale * 1.15);
+      drawCheer(ctx, W / 2 + cx, mid, t + 0.4, '#ffd23f', fscale * 1.15);
+
+      // репортёры с камерами в нижних углах
+      const rx = L.narrow ? 24 : 44;
+      drawReporter(ctx, s + rx, H - mid, fscale * 1.2, false);
+      drawReporter(ctx, W - s - rx, H - mid, fscale * 1.2, true);
     }
 
     roundRect(ctx, x, y, w, h, r) {

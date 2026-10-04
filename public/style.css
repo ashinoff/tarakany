@@ -180,6 +180,31 @@ p { margin: 0; }
 .r-nick { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .r-cpm { font-variant-numeric: tabular-nums; color: #fff; font-weight: 600; }
 
+/* правая колонка входа: список комнат + рекорды */
+.side { display: flex; flex-direction: column; gap: 26px; }
+.rooms-panel h2 {
+  font: 600 20px var(--font-display);
+  letter-spacing: -0.02em;
+  color: #fff;
+  margin-bottom: 14px;
+}
+.rooms-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.rooms-list li.empty { color: var(--on-wall); opacity: 0.85; }
+.room-item {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  gap: 10px;
+  background: var(--enamel);
+  border: 2px solid var(--wall-deep);
+  border-radius: 10px;
+  padding: 8px 10px 8px 14px;
+}
+.room-item.closed { opacity: 0.6; }
+.room-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.room-count { font-variant-numeric: tabular-nums; color: #5d6f68; font-size: 14px; }
+.room-state { font-size: 13px; color: #5d6f68; min-width: 3.5em; }
+
 /* ---------- Экран заезда ---------- */
 .topbar {
   background: var(--wall-deep);
@@ -231,7 +256,7 @@ p { margin: 0; }
 .race-stage {
   position: relative;
   margin: 10px 10px 4px;
-  height: clamp(460px, 74vh, 860px);
+  height: clamp(520px, 82vh, 920px);
   border: 3px solid var(--wall-deep);
   border-radius: var(--radius);
   overflow: hidden;
@@ -399,7 +424,7 @@ p { margin: 0; }
   border: 3px solid var(--wall-deep);
   border-radius: 12px;
   box-shadow: var(--plate-shadow);
-  padding: 22px 24px;
+  padding: 16px 18px;
 }
 .board h2 { font: 600 22px var(--font-display); letter-spacing: -0.02em; margin-bottom: 8px; }
 .board p { max-width: 60ch; }
@@ -407,6 +432,58 @@ p { margin: 0; }
 .board .auto { margin-top: 10px; font-weight: 500; }
 .board .auto b { font: 600 18px var(--font-display); font-variant-numeric: tabular-nums; }
 .board-row { display: flex; gap: 24px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+
+/* лобби: ростер + готовность + боты + кик */
+.lobby { display: flex; flex-direction: column; gap: 12px; height: 100%; }
+.lobby-head h2 { font: 600 19px var(--font-display); letter-spacing: -0.02em; margin-bottom: 4px; }
+.lobby-head p { font-size: 14px; }
+.lobby-head .auto { margin-top: 8px; font-weight: 500; }
+.lobby-head .auto b { font: 600 18px var(--font-display); font-variant-numeric: tabular-nums; }
+.roster { list-style: none; margin: 0; padding: 0; flex: 1; overflow-y: auto; min-height: 0; display: flex; flex-direction: column; gap: 6px; }
+.roster li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: 8px;
+  background: #f1efe6;
+}
+.roster li.you { background: rgba(240, 180, 41, 0.22); }
+.roster .s-dot { width: 13px; height: 13px; border-radius: 50%; flex: none; }
+.l-nick { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.l-nick .tag {
+  font: 500 11px var(--font-body);
+  color: #5d6f68;
+  background: #e2e6de;
+  border-radius: 20px;
+  padding: 1px 8px;
+  margin-left: 4px;
+  white-space: nowrap;
+}
+.l-ready { font-size: 13px; color: #9aa6a0; flex: none; }
+.l-ready.on { color: var(--done); font-weight: 600; }
+.kick {
+  flex: none;
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--brick);
+  background: #fff;
+  color: var(--brick);
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1;
+}
+.kick:hover { background: var(--brick); color: #fff; }
+.lobby-controls { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.bot-box { display: flex; gap: 6px; align-items: center; }
+.bot-box select {
+  font: 500 14px var(--font-body);
+  padding: 9px 10px;
+  border: 2px solid var(--wall-deep);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--ink);
+}
 
 .table-wrap { overflow-x: auto; margin-top: 6px; }
 .board table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }

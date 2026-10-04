@@ -14,14 +14,24 @@ const RECORDS_FILE = path.join(DATA_DIR, 'records.json');
 
 const MAX_PLAYERS = 8;          // тараканов в одном заезде
 const COUNTDOWN_MS = 3000;      // 3-2-1
-const AUTOSTART_MS = 15000;     // общий заезд стартует сам, когда собралось 2+ игроков
+const AUTOSTART_MS = 15000;     // общий (быстрый) заезд стартует сам, когда собралось 2+ игроков
 const FULL_ROOM_START_MS = 4000;// ...или почти сразу, если комната заполнена
 const RESULTS_MS = 12000;       // сколько показываем результаты
 const TICK_MS = 100;            // шаг игрового цикла
 const MAX_CPS = 25;             // быстрее 25 знаков/сек (1500 зн/мин) - явный чит
 const NICK_MAX = 16;
+const ROOM_NAME_MAX = 22;
 
 const COLORS = ['#d64532', '#2f6fde', '#e3a512', '#2f9e63', '#8d4bc4', '#e2702c', '#14a0a0', '#d6457a'];
+
+// Уровни ботов: cps - знаков в секунду, acc - точность, label - подпись.
+const BOT_LEVELS = {
+  easy: { cps: 2.2, acc: 0.95, label: 'Лёгкий' },        // ~130 зн/мин
+  medium: { cps: 4.0, acc: 0.97, label: 'Средний' },     // ~240 зн/мин
+  hard: { cps: 6.0, acc: 0.985, label: 'Сложный' },      // ~360 зн/мин
+  insane: { cps: 9.0, acc: 0.995, label: 'Терминатор' }, // ~540 зн/мин
+};
+const BOT_NAMES = ['Шустрик', 'Тапкобой', 'Усатый', 'Прусак', 'Рыжик', 'Дусти', 'Форсаж', 'Крошка', 'Турбо', 'Жужик'];
 
 // ---------- Рекорды (лежат в постоянном хранилище /data на Amvera) ----------
 let records = [];
@@ -72,6 +82,8 @@ const io = new Server(server);
 
 // ---------- Комнаты ----------
 const rooms = new Map();
+let quickSeq = 0;
+let lobbyDirty = true; // нужно разослать свежий список открытых комнат
 
 function genCode() {
   const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -82,9 +94,15 @@ function genCode() {
   return code;
 }
 
-function createRoom(code, isPrivate) {
+// auto - быстрый общий заезд (автостарт по таймеру); isPrivate - скрыт из списка (только по коду)
+function createRoom(code, opts = {}) {
+  const isPrivate = Boolean(opts.isPrivate);
+  const auto = Boolean(opts.auto);
+  const name = opts.name || (auto ? `Общий заезд ${++quickSeq}` : isPrivate ? `Комната ${code}` : `Комната ${code}`);
   const room = {
     code,
+    name,
+    auto,
     isPrivate,
     state: 'waiting', // waiting -> countdown -> racing -> finished -> waiting
     players: new Map(),
@@ -96,17 +114,19 @@ function createRoom(code, isPrivate) {
     autoStartAt: 0,
     resetAt: 0,
     finishCount: 0,
+    botSeq: 0,
     dirty: true,
   };
   rooms.set(code, room);
+  lobbyDirty = true;
   return room;
 }
 
 function findPublicRoom() {
   for (const room of rooms.values()) {
-    if (!room.isPrivate && room.state === 'waiting' && room.players.size < MAX_PLAYERS) return room;
+    if (room.auto && !room.isPrivate && room.state === 'waiting' && room.players.size < MAX_PLAYERS) return room;
   }
-  return createRoom(genCode(), false);
+  return createRoom(genCode(), { auto: true });
 }
 
 function pickText(room) {
@@ -120,10 +140,18 @@ function pickText(room) {
 
 function cleanNick(raw) {
   return String(raw || '')
-    .replace(/[\u0000-\u001f<>]/g, '')
+    .replace(/[<>]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, NICK_MAX);
+}
+
+function cleanRoomName(raw) {
+  return String(raw || '')
+    .replace(/[<>]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, ROOM_NAME_MAX);
 }
 
 function uniqueNick(room, nick) {
@@ -140,21 +168,29 @@ function freeColor(room) {
   return COLORS.find((c) => !used.has(c)) || COLORS[room.players.size % COLORS.length];
 }
 
+function botName(room) {
+  const taken = new Set([...room.players.values()].map((p) => p.nick.toLowerCase()));
+  const free = BOT_NAMES.filter((n) => !taken.has(('бот ' + n).toLowerCase()));
+  const pool = free.length ? free : BOT_NAMES;
+  return 'Бот ' + pool[Math.floor(Math.random() * pool.length)];
+}
+
 const racers = (room) => [...room.players.values()].filter((p) => !p.spectator);
+const humans = (room) => [...room.players.values()].filter((p) => !p.bot);
 
 function resetPlayer(p) {
-  Object.assign(p, { progress: 0, errors: 0, finishedAt: 0, place: 0, cpm: 0, acc: 100, time: 0, dnf: false });
+  Object.assign(p, { progress: 0, errors: 0, finishedAt: 0, place: 0, cpm: 0, acc: 100, time: 0, dnf: false, exact: 0 });
 }
 
 function updateAutoStart(room) {
-  if (room.state !== 'waiting' || room.isPrivate) {
+  if (room.state !== 'waiting' || !room.auto) {
     room.autoStartAt = 0;
     return;
   }
   const now = Date.now();
   if (room.players.size < 2) room.autoStartAt = 0;
   else if (!room.autoStartAt) room.autoStartAt = now + AUTOSTART_MS;
-  if (room.players.size >= MAX_PLAYERS) room.autoStartAt = Math.min(room.autoStartAt, now + FULL_ROOM_START_MS);
+  if (room.players.size >= MAX_PLAYERS) room.autoStartAt = Math.min(room.autoStartAt || Infinity, now + FULL_ROOM_START_MS);
   room.dirty = true;
 }
 
@@ -172,6 +208,7 @@ function startCountdown(room) {
     resetPlayer(p);
   }
   room.dirty = true;
+  lobbyDirty = true;
 }
 
 function finishRace(room) {
@@ -189,6 +226,7 @@ function finishRace(room) {
     p.acc = p.progress ? Math.round((1000 * p.progress) / (p.progress + p.errors)) / 10 : 0;
   }
   room.dirty = true;
+  lobbyDirty = true;
 }
 
 function resetRoom(room) {
@@ -199,15 +237,44 @@ function resetRoom(room) {
   room.resetAt = 0;
   for (const p of room.players.values()) {
     p.spectator = false;
+    p.ready = Boolean(p.bot); // боты всегда готовы, людям жать заново
     resetPlayer(p);
   }
   updateAutoStart(room);
   room.dirty = true;
+  lobbyDirty = true;
+}
+
+// Боты бегут сами: подкручиваем прогресс исходя из их скорости и лёгкого колебания.
+function advanceBots(room, now) {
+  if (room.state !== 'racing') return;
+  const dt = TICK_MS / 1000;
+  for (const p of room.players.values()) {
+    if (!p.bot || p.spectator || p.finishedAt) continue;
+    const wob = 0.75 + 0.5 * Math.abs(Math.sin(now / 600 + p.wobblePhase));
+    p.exact += p.cps * dt * wob;
+    const pos = Math.min(room.text.length, Math.floor(p.exact));
+    if (pos > p.progress) {
+      p.progress = pos;
+      room.dirty = true;
+    }
+    if (p.progress >= room.text.length && !p.finishedAt) {
+      p.finishedAt = now;
+      p.place = ++room.finishCount;
+      p.time = now - room.startAt;
+      p.cpm = Math.round(p.progress / (p.time / 60000));
+      p.errors = Math.round((p.progress * (1 - p.accTarget)) / p.accTarget);
+      p.acc = Math.round((1000 * p.progress) / (p.progress + p.errors)) / 10;
+      room.dirty = true;
+    }
+  }
 }
 
 function roomState(room) {
   return {
     code: room.code,
+    name: room.name,
+    auto: room.auto,
     isPrivate: room.isPrivate,
     state: room.state,
     hostId: room.hostId,
@@ -222,6 +289,9 @@ function roomState(room) {
       id: p.id,
       nick: p.nick,
       color: p.color,
+      bot: Boolean(p.bot),
+      level: p.bot ? p.level : undefined,
+      ready: Boolean(p.ready),
       progress: p.progress,
       errors: p.errors,
       finished: Boolean(p.finishedAt),
@@ -235,6 +305,13 @@ function roomState(room) {
   };
 }
 
+function publicRooms() {
+  return [...rooms.values()]
+    .filter((r) => !r.isPrivate)
+    .map((r) => ({ code: r.code, name: r.name, count: r.players.size, max: MAX_PLAYERS, state: r.state }))
+    .sort((a, b) => (a.state === 'waiting' ? 0 : 1) - (b.state === 'waiting' ? 0 : 1) || b.count - a.count);
+}
+
 function leaveRoom(socket) {
   const code = socket.data.roomCode;
   if (!code) return;
@@ -243,18 +320,24 @@ function leaveRoom(socket) {
   const room = rooms.get(code);
   if (!room) return;
   room.players.delete(socket.id);
-  if (room.players.size === 0) {
+  // если людей не осталось - комнату (вместе с ботами) закрываем
+  if (humans(room).length === 0) {
     rooms.delete(code);
+    lobbyDirty = true;
     return;
   }
-  if (room.hostId === socket.id) room.hostId = room.players.keys().next().value;
+  if (room.hostId === socket.id) room.hostId = humans(room)[0].id;
   updateAutoStart(room);
   room.dirty = true;
+  lobbyDirty = true;
 }
 
 // ---------- Сокеты ----------
 io.on('connection', (socket) => {
   socket.emit('records', topRecords());
+  socket.emit('rooms', publicRooms());
+
+  socket.on('rooms', () => socket.emit('rooms', publicRooms()));
 
   socket.on('join', (data, ack) => {
     const reply = typeof ack === 'function' ? ack : () => {};
@@ -266,13 +349,14 @@ io.on('connection', (socket) => {
 
     let room;
     if (data.mode === 'create') {
-      room = createRoom(genCode(), true);
+      const name = cleanRoomName(data.name) || `Комната ${nick}`;
+      room = createRoom(genCode(), { isPrivate: false, auto: false, name });
     } else if (data.mode === 'code') {
       const code = String(data.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
       if (code.length < 3 || code.length > 8) {
         return reply({ error: 'Код комнаты: от 3 до 8 латинских букв или цифр.' });
       }
-      room = rooms.get(code) || createRoom(code, true);
+      room = rooms.get(code) || createRoom(code, { isPrivate: true, auto: false });
     } else {
       room = findPublicRoom();
     }
@@ -285,6 +369,8 @@ io.on('connection', (socket) => {
       id: socket.id,
       nick: uniqueNick(room, nick),
       color: freeColor(room),
+      bot: false,
+      ready: false,
       spectator: room.state !== 'waiting', // пришёл посреди заезда - бежит в следующем
     };
     resetPlayer(player);
@@ -295,15 +381,90 @@ io.on('connection', (socket) => {
     socket.join(room.code);
     updateAutoStart(room);
     room.dirty = true;
+    lobbyDirty = true;
 
-    reply({ ok: true, you: socket.id, code: room.code, nick: player.nick, isPrivate: room.isPrivate });
+    reply({ ok: true, you: socket.id, code: room.code, name: room.name, nick: player.nick, isPrivate: room.isPrivate, auto: room.auto });
     socket.emit('state', roomState(room));
+  });
+
+  socket.on('ready', (data) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!room || room.state !== 'waiting') return;
+    const p = room.players.get(socket.id);
+    if (!p) return;
+    p.ready = data && data.ready !== undefined ? Boolean(data.ready) : !p.ready;
+    room.dirty = true;
   });
 
   socket.on('start', () => {
     const room = rooms.get(socket.data.roomCode);
     if (!room || room.hostId !== socket.id) return;
     startCountdown(room);
+  });
+
+  socket.on('kick', (data) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!room || room.hostId !== socket.id) return;
+    const id = data && data.id;
+    if (!id || id === socket.id) return;
+    const p = room.players.get(id);
+    if (!p) return;
+    if (p.bot) {
+      room.players.delete(id);
+      updateAutoStart(room);
+      room.dirty = true;
+      lobbyDirty = true;
+    } else {
+      const s = io.sockets.sockets.get(id);
+      if (s) {
+        s.emit('kicked');
+        leaveRoom(s);
+      } else {
+        room.players.delete(id);
+        if (humans(room).length === 0) rooms.delete(room.code);
+        else room.dirty = true;
+        lobbyDirty = true;
+      }
+    }
+  });
+
+  socket.on('addBot', (data) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!room || room.hostId !== socket.id || room.state !== 'waiting') return;
+    if (room.players.size >= MAX_PLAYERS) return;
+    const level = data && BOT_LEVELS[data.level] ? data.level : 'medium';
+    const cfg = BOT_LEVELS[level];
+    const id = 'bot:' + room.code + ':' + (++room.botSeq);
+    const bot = {
+      id,
+      nick: uniqueNick(room, botName(room)),
+      color: freeColor(room),
+      bot: true,
+      level,
+      cps: cfg.cps,
+      accTarget: cfg.acc,
+      wobblePhase: Math.random() * 6,
+      ready: true,
+      spectator: false,
+    };
+    resetPlayer(bot);
+    room.players.set(id, bot);
+    updateAutoStart(room);
+    room.dirty = true;
+    lobbyDirty = true;
+  });
+
+  socket.on('removeBot', (data) => {
+    const room = rooms.get(socket.data.roomCode);
+    if (!room || room.hostId !== socket.id) return;
+    const id = data && data.id;
+    const p = id && room.players.get(id);
+    if (p && p.bot) {
+      room.players.delete(id);
+      updateAutoStart(room);
+      room.dirty = true;
+      lobbyDirty = true;
+    }
   });
 
   socket.on('progress', (data) => {
@@ -340,7 +501,10 @@ io.on('connection', (socket) => {
     room.dirty = true;
   });
 
-  socket.on('leave', () => leaveRoom(socket));
+  socket.on('leave', () => {
+    leaveRoom(socket);
+    socket.emit('rooms', publicRooms());
+  });
   socket.on('disconnect', () => leaveRoom(socket));
 });
 
@@ -353,7 +517,9 @@ setInterval(() => {
     } else if (room.state === 'countdown' && now >= room.startAt) {
       room.state = 'racing';
       room.dirty = true;
+      lobbyDirty = true;
     } else if (room.state === 'racing') {
+      advanceBots(room, now);
       const rs = racers(room);
       if (rs.length === 0 || rs.every((p) => p.finishedAt) || now >= room.endAt) finishRace(room);
     } else if (room.state === 'finished' && now >= room.resetAt) {
@@ -364,6 +530,11 @@ setInterval(() => {
       room.dirty = false;
       io.to(room.code).emit('state', roomState(room));
     }
+  }
+
+  if (lobbyDirty) {
+    lobbyDirty = false;
+    io.emit('rooms', publicRooms());
   }
 }, TICK_MS);
 

@@ -30,9 +30,10 @@
         <form id="loginForm" class="enamel login-form" novalidate>
           <label for="nick">Ник</label>
           <input id="nick" name="nick" maxlength="16" autocomplete="nickname" placeholder="Например, Рыжий" required>
-          <button type="submit" id="quickBtn" class="btn primary big">В гонку</button>
+          <button type="submit" id="quickBtn" class="btn primary big">Быстрая гонка</button>
 
-          <p class="divider">или с друзьями</p>
+          <p class="divider">своя комната</p>
+          <input id="roomName" maxlength="22" placeholder="Название комнаты (необязательно)" autocomplete="off" spellcheck="false">
           <button type="button" id="createBtn" class="btn">Создать комнату</button>
           <div class="code-row">
             <label class="visually-hidden" for="code">Код комнаты</label>
@@ -42,11 +43,20 @@
           <p id="loginError" class="error" role="alert"></p>
         </form>
 
-        <aside class="records" aria-labelledby="recordsTitle">
-          <h2 id="recordsTitle">Самые быстрые</h2>
-          <ol id="recordsList">
-            <li class="empty">Загружаем таблицу…</li>
-          </ol>
+        <aside class="side">
+          <section class="rooms-panel" aria-labelledby="roomsTitle">
+            <h2 id="roomsTitle">Открытые заезды</h2>
+            <ul id="roomsList" class="rooms-list">
+              <li class="empty">Пока пусто — создай первую комнату или жми «Быстрая гонка».</li>
+            </ul>
+          </section>
+
+          <section class="records" aria-labelledby="recordsTitle">
+            <h2 id="recordsTitle">Самые быстрые</h2>
+            <ol id="recordsList">
+              <li class="empty">Загружаем таблицу…</li>
+            </ol>
+          </section>
         </aside>
       </div>
     </div>

@@ -53,6 +53,8 @@
   let joined = null; // как переподключаться: {mode, code, nick}
   let room = null;
   let clockOffset = null;
+  let botLevel = 'medium'; // выбранная сложность бота (у админа комнаты)
+  const BOT_LABELS = { easy: 'Лёгкий', medium: 'Средний', hard: 'Сложный', insane: 'Терминатор' };
 
   // набор текста
   let text = '';
@@ -89,14 +91,17 @@
     }
     showLoginError('');
     store.set('nick', nick);
-    socket.emit('join', { nick, mode, code }, (res) => {
+    const payload = { nick, mode, code };
+    if (mode === 'create') payload.name = $('roomName').value.trim();
+    socket.emit('join', payload, (res) => {
       if (!res || res.error) {
         showLoginError(res ? res.error : 'Сервер не ответил. Попробуй ещё раз.');
         return;
       }
       me = { id: res.you, nick: res.nick };
-      joined = res.isPrivate ? { mode: 'code', code: res.code, nick } : { mode: 'quick', nick };
-      history.replaceState(null, '', res.isPrivate ? `?room=${res.code}` : location.pathname);
+      // auto - быстрый общий заезд (вернёмся в любой свободный), иначе держимся за код комнаты
+      joined = res.auto ? { mode: 'quick', nick } : { mode: 'code', code: res.code, nick };
+      history.replaceState(null, '', res.auto ? location.pathname : `?room=${res.code}`);
       showScreen('race');
     });
   }
@@ -170,6 +175,50 @@
     ol.innerHTML = list
       .map((r) => `<li><span class="r-nick">${escapeHtml(r.nick)}</span><span class="r-cpm">${r.cpm} зн/мин</span></li>`)
       .join('');
+  });
+
+  // ---------- Список открытых комнат ----------
+  socket.on('rooms', (list) => renderRooms(list));
+
+  function renderRooms(list) {
+    const ul = $('roomsList');
+    if (!ul) return;
+    if (!list || !list.length) {
+      ul.innerHTML = '<li class="empty">Пока пусто — создай первую комнату или жми «Быстрая гонка».</li>';
+      return;
+    }
+    ul.innerHTML = list
+      .map((r) => {
+        const racing = r.state !== 'waiting';
+        const full = r.count >= r.max;
+        const status = racing ? 'бежит' : full ? 'полна' : 'ждут';
+        const dis = racing || full;
+        return (
+          `<li class="room-item${dis ? ' closed' : ''}">` +
+          `<span class="room-name">${escapeHtml(r.name)}</span>` +
+          `<span class="room-count">${r.count}/${r.max}</span>` +
+          `<span class="room-state">${status}</span>` +
+          `<button type="button" class="btn small" data-code="${escapeHtml(r.code)}"${dis ? ' disabled' : ''}>Зайти</button>` +
+          `</li>`
+        );
+      })
+      .join('');
+  }
+
+  $('roomsList').addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-code]');
+    if (btn) join('code', btn.getAttribute('data-code'));
+  });
+
+  // Админ комнаты выгнал
+  socket.on('kicked', () => {
+    joined = null;
+    room = null;
+    resetTyping();
+    history.replaceState(null, '', location.pathname);
+    showScreen('login');
+    showLoginError('Админ комнаты высадил тебя из заезда.');
+    socket.emit('rooms');
   });
 
   // ---------- Соединение ----------
@@ -397,10 +446,10 @@
   function renderHeader() {
     if (!room) return;
     const count = room.players.length;
-    $('roomLabel').textContent = room.isPrivate
-      ? `Комната ${room.code}, тараканов: ${count} из ${room.maxPlayers}`
-      : `Общий заезд, тараканов: ${count} из ${room.maxPlayers}`;
-    $('copyLink').hidden = !room.isPrivate;
+    const where = room.auto ? 'Общий заезд' : `Комната «${room.name}»`;
+    const codePart = !room.auto ? ` · код ${room.code}` : '';
+    $('roomLabel').textContent = `${where} · тараканов ${count}/${room.maxPlayers}${codePart}`;
+    $('copyLink').hidden = room.auto; // в именованных комнатах можно звать по ссылке
   }
 
   function renderSpectators() {
@@ -428,22 +477,69 @@
     let key = room.state;
 
     if (room.state === 'waiting') {
-      const alone = room.players.length < 2;
-      key += `|${room.players.length}|${isHost}|${room.autoStartAt}|${host && host.nick}`;
+      const players = room.players;
+      const alone = players.length < 2;
+      const sig = players.map((p) => `${p.id}:${p.nick}:${p.ready ? 1 : 0}:${p.bot ? p.level : ''}`).join('|');
+      key += `|${sig}|${isHost}|${room.autoStartAt}|${botLevel}`;
+
       let note;
-      if (room.isPrivate) note = 'Отправь друзьям ссылку на комнату. Заезд запускает тот, кто зашёл первым.';
-      else if (alone) note = 'Заезд стартует сам, когда подтянется ещё кто-нибудь. Можно не ждать и пробежать одному.';
-      else note = 'Скоро старт. Положи пальцы на клавиатуру.';
+      if (alone && !room.auto) note = 'Позови друзей по ссылке или добавь ботов. Старт даёшь ты.';
+      else if (room.auto && alone) note = 'Заезд стартует сам, когда подтянется ещё таракан. Не хочешь ждать - добавь бота или жми «Старт».';
+      else note = 'Жмите «Готов» и ждите, пока админ даст старт.';
+
+      const rosterRows = players
+        .map((p) => {
+          const you = p.id === me.id;
+          const isHostP = p.id === room.hostId;
+          const badges = [you ? 'ты' : '', isHostP ? 'админ' : '', p.bot ? 'бот · ' + (BOT_LABELS[p.level] || '') : '']
+            .filter(Boolean)
+            .map((b) => `<span class="tag">${b}</span>`)
+            .join('');
+          const ready = p.bot ? true : p.ready;
+          const kick = isHost && !you ? `<button type="button" class="kick" title="Выгнать" data-kick="${p.id}">✕</button>` : '';
+          return (
+            `<li class="${you ? 'you' : ''}">` +
+            `<span class="s-dot" style="background:${p.color}"></span>` +
+            `<span class="l-nick">${escapeHtml(p.nick)} ${badges}</span>` +
+            `<span class="l-ready ${ready ? 'on' : ''}">${ready ? 'готов' : '…'}</span>` +
+            kick +
+            `</li>`
+          );
+        })
+        .join('');
+
+      const readyBtn =
+        mine && !mine.spectator
+          ? `<button type="button" class="btn ${mine.ready ? '' : 'primary'}" data-action="ready">${mine.ready ? 'Готов ✓ (отменить)' : 'Я готов!'}</button>`
+          : '';
+      const botBox = isHost
+        ? `<div class="bot-box">
+             <select data-botlevel aria-label="Сложность бота">
+               <option value="easy">Лёгкий</option>
+               <option value="medium">Средний</option>
+               <option value="hard">Сложный</option>
+               <option value="insane">Терминатор</option>
+             </select>
+             <button type="button" class="btn small" data-action="addbot"${players.length >= room.maxPlayers ? ' disabled' : ''}>+ таракан-бот</button>
+           </div>`
+        : '';
+      const startBtn = isHost
+        ? '<button type="button" class="btn primary big" data-action="start">Старт</button>'
+        : `<p class="muted">Старт даёт ${escapeHtml(host ? host.nick : 'админ')}.</p>`;
+
       html = `
-        <div class="board-row">
-          <div>
-            <h2>${alone ? 'Пока ты один на старте' : 'Тараканы в боксах'}</h2>
+        <div class="lobby">
+          <div class="lobby-head">
+            <h2>${alone && !room.auto ? 'Ты пока один на старте' : 'Тараканы в боксах'}</h2>
             <p>${note}</p>
-            ${room.autoStartAt ? '<p class="auto">Старт через <b data-auto></b> с</p>' : ''}
+            ${room.autoStartAt ? '<p class="auto">Автостарт через <b data-auto></b> с</p>' : ''}
           </div>
-          ${isHost
-            ? '<button type="button" class="btn primary big" data-action="start">Старт</button>'
-            : `<p class="muted">Заезд запустит ${escapeHtml(host ? host.nick : 'создатель комнаты')}.</p>`}
+          <ul class="roster">${rosterRows}</ul>
+          <div class="lobby-controls">
+            ${readyBtn}
+            ${startBtn}
+            ${botBox}
+          </div>
         </div>`;
     } else if (room.state === 'finished') {
       key += `|${room.resetAt}`;
@@ -475,6 +571,8 @@
     if (!typingVisible && key !== boardKey) {
       boardKey = key;
       $('board').innerHTML = html;
+      const sel = $('board').querySelector('[data-botlevel]');
+      if (sel) sel.value = botLevel;
     }
     if (typingVisible) boardKey = '';
 
@@ -494,11 +592,28 @@
   }
 
   $('board').addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-action="start"]');
-    if (btn) {
-      socket.emit('start');
-      btn.disabled = true;
+    const kickBtn = e.target.closest('[data-kick]');
+    if (kickBtn) {
+      socket.emit('kick', { id: kickBtn.getAttribute('data-kick') });
+      return;
     }
+    const act = e.target.closest('[data-action]');
+    if (!act) return;
+    const a = act.getAttribute('data-action');
+    if (a === 'start') {
+      socket.emit('start');
+      act.disabled = true;
+    } else if (a === 'ready') {
+      const meP = myPlayer();
+      socket.emit('ready', { ready: !(meP && meP.ready) });
+    } else if (a === 'addbot') {
+      socket.emit('addBot', { level: botLevel });
+    }
+  });
+
+  $('board').addEventListener('change', (e) => {
+    const sel = e.target.closest('[data-botlevel]');
+    if (sel) botLevel = sel.value;
   });
 
   function formatTime(ms) {
@@ -542,7 +657,8 @@
         let val = '';
         if (racing) val = Math.round((100 * (p.progress || 0)) / Math.max(1, len)) + '%';
         else if (room.state === 'finished') val = p.dnf ? 'сошёл' : (p.place ? '#' + p.place : '');
-        const rank = waiting ? '🪳' : i + 1;
+        else if (waiting) val = (p.bot || p.ready) ? '✓' : '';
+        const rank = waiting ? '' : i + 1;
         return (
           `<li class="${you ? 'you' : ''}">` +
           `<span class="s-rank">${rank}</span>` +
