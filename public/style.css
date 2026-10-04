@@ -256,7 +256,8 @@ p { margin: 0; }
 .race-stage {
   position: relative;
   margin: 10px 10px 4px;
-  height: clamp(520px, 82vh, 920px);
+  /* трибуны сверху и снизу стали высокими - отдаём им высоту, поле в центре не ужимаем */
+  height: clamp(620px, calc(100vh - 112px), 1040px);
   border: 3px solid var(--wall-deep);
   border-radius: var(--radius);
   overflow: hidden;
@@ -556,7 +557,7 @@ p { margin: 0; }
   .wrap { padding: 0 14px; }
   .brand-sub { display: none; }
   .room-label { font-size: 13px; min-width: 0; }
-  .race-stage { height: clamp(520px, 80vh, 900px); margin: 8px 6px 4px; }
+  .race-stage { height: clamp(600px, calc(80vh + 70px), 980px); margin: 8px 6px 4px; }
   .ring-inner { flex-direction: column; gap: 10px; }
   .standings { width: auto; flex: none; max-height: 34%; }
   .standings-list { font-size: 13px; }

@@ -253,6 +253,7 @@
 
     const lane = s.state === 'waiting' ? s.players : s.players.filter((p) => !p.spectator);
     track.setRace(lane, me.id, s.state === 'waiting' ? 1 : s.text.length);
+    track.setPhase(s.state); // трибуны реагируют на отсчёт, старт и финиш
     if (mine && !mine.spectator && s.state !== 'waiting') track.setProgress(me.id, pos);
 
     renderHeader();
