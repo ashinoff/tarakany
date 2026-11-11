@@ -72,6 +72,41 @@
   const codeInput = $('code');
   nickInput.value = store.get('nick') || '';
 
+  // ---------- Платформа (web-desktop) ----------
+  // Внутри iframe платформы она присылает Keycloak-токен: { type: 'platform-auth', token }.
+  // Берём из него только имя для ника - прав в игре нет, поэтому подпись токена не проверяем.
+  // Сообщения принимаем лишь от родительского окна с известного адреса платформы.
+  const PLATFORM_ORIGINS = ['https://sue-system-2-ashinoff.waw0.amvera.tech', 'http://localhost:5173'];
+  const EMBEDDED = window.self !== window.top;
+
+  function platformNick(token) {
+    try {
+      const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      const json = decodeURIComponent(escape(atob(b64)));
+      const c = JSON.parse(json);
+      const first = (c.given_name || '').trim();
+      const last = (c.family_name || '').trim();
+      let nick = first && last ? `${first} ${last[0]}.` : first || c.name || c.preferred_username || '';
+      return String(nick).trim().slice(0, 16);
+    } catch {
+      return '';
+    }
+  }
+
+  if (EMBEDDED) {
+    window.addEventListener('message', (e) => {
+      if (e.source !== window.parent || !PLATFORM_ORIGINS.includes(e.origin)) return;
+      if (!e.data || e.data.type !== 'platform-auth' || !e.data.token) return;
+      const nick = platformNick(e.data.token);
+      // свой ник, который игрок уже вводил, не затираем
+      if (nick && !nickInput.value.trim()) nickInput.value = nick;
+    });
+    // пинг готовности: платформа ответит токеном, даже если onLoad iframe прошёл раньше
+    window.parent.postMessage({ type: 'app-ready' }, '*');
+    // ссылка из окна платформы увела бы мимо неё, поэтому зовём друзей кодом комнаты
+    $('copyLink').textContent = 'Скопировать код';
+  }
+
   const urlRoom = (new URLSearchParams(location.search).get('room') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (urlRoom) {
     codeInput.value = urlRoom;
@@ -155,12 +190,12 @@
 
   $('copyLink').addEventListener('click', async () => {
     if (!room) return;
-    const link = `${location.origin}${location.pathname}?room=${room.code}`;
+    const link = EMBEDDED ? room.code : `${location.origin}${location.pathname}?room=${room.code}`;
     try {
       await navigator.clipboard.writeText(link);
-      flashButton($('copyLink'), 'Ссылка скопирована');
+      flashButton($('copyLink'), EMBEDDED ? 'Код скопирован' : 'Ссылка скопирована');
     } catch {
-      prompt('Скопируй ссылку на комнату:', link);
+      prompt(EMBEDDED ? 'Код комнаты:' : 'Скопируй ссылку на комнату:', link);
     }
   });
 
