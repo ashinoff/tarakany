@@ -406,7 +406,7 @@
   function canType() {
     return canContinueRace({
       room, player: myPlayer(), textLength: text.length, pos, gaveUp,
-      now: serverNow(), offlineSince: connectionReady ? null : offlineSince,
+      now: serverNow(), localNow: Date.now(), offlineSince: connectionReady ? null : offlineSince,
     });
   }
 
