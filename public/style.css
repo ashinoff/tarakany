@@ -541,16 +541,23 @@ p { margin: 0; }
 
 .offline {
   position: fixed;
+  z-index: 30;
   left: 50%;
-  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
-  background: var(--brick);
-  color: #fff;
-  padding: 10px 18px;
+  max-width: calc(100vw - 24px);
+  background: var(--wall-deep);
+  color: var(--enamel);
+  border: 1px solid var(--done);
+  padding: 8px 13px;
   border-radius: 10px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
   box-shadow: 0 3px 0 var(--ink);
+  pointer-events: none;
 }
+.offline[data-severe="true"] { background: var(--brick); border-color: var(--brick); }
 
 /* ---------- Мобильные ---------- */
 @media (max-width: 760px) {
