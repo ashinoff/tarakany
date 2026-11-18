@@ -125,7 +125,7 @@
       }
       me = { id: res.you, nick: res.nick };
       // Даже при быстром заезде восстанавливаем ту же комнату, а не случайную новую.
-      joined = { mode: 'resume', code: res.code, nick, sessionToken };
+      joined = { mode: sessionToken ? 'resume' : 'code', code: res.code, nick, sessionToken };
       history.replaceState(null, '', res.auto ? location.pathname : `?room=${res.code}`);
       showScreen('race');
     });
