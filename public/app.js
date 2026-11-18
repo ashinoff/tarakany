@@ -93,6 +93,7 @@
   function hideOfflineNotice() {
     if (offlineNoticeTimer) clearTimeout(offlineNoticeTimer);
     offlineNoticeTimer = null;
+    delete $('offline').dataset.severe;
     $('offline').hidden = true;
   }
 
@@ -872,6 +873,7 @@
       renderStandings();
     }
     if (joined && !connectionReady && offlineSince !== null && Date.now() - offlineSince >= LOCAL_GRACE_MS) {
+      $('offline').dataset.severe = 'true';
       $('offline').textContent = 'Слишком долгий обрыв: ввод приостановлен, место в заезде может быть потеряно.';
       $('offline').hidden = false;
     }
