@@ -40,18 +40,13 @@
     },
   };
 
-  // Случайный ключ этой вкладки помогает найти того же игрока после обрыва.
-  // Он не передается другим клиентам и не является паролем от аккаунта.
+  // Ключ только для этой открытой страницы: при временном обрыве сохраняется,
+  // но дублированные вкладки не смогут случайно отобрать чужое место в комнате.
   const sessionToken = (() => {
     try {
-      const key = 'tarakan-race-session';
-      const prev = sessionStorage.getItem(key);
-      if (prev && /^[a-f0-9]{32}$/.test(prev)) return prev;
       const bytes = new Uint8Array(16);
       window.crypto.getRandomValues(bytes);
-      const token = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
-      sessionStorage.setItem(key, token);
-      return token;
+      return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
     } catch {
       return null;
     }
