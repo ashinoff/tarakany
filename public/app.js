@@ -40,11 +40,36 @@
     },
   };
 
+  // Случайный ключ этой вкладки помогает найти того же игрока после обрыва.
+  // Он не передается другим клиентам и не является паролем от аккаунта.
+  const sessionToken = (() => {
+    try {
+      const key = 'tarakan-race-session';
+      const prev = sessionStorage.getItem(key);
+      if (prev && /^[a-f0-9]{32}$/.test(prev)) return prev;
+      const bytes = new Uint8Array(16);
+      window.crypto.getRandomValues(bytes);
+      const token = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+      sessionStorage.setItem(key, token);
+      return token;
+    } catch {
+      return null;
+    }
+  })();
+
   const escapeHtml = (s) =>
     String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   // ---------- Состояние ----------
-  const socket = io();
+  // WebSocket первым: меньше HTTP-запросов и меньше проблем с балансировкой.
+  // Если WebSocket недоступен, Socket.IO попробует обычный polling.
+  const socket = io({
+    transports: ['websocket', 'polling'],
+    tryAllTransports: true,
+    reconnectionDelay: 750,
+    reconnectionDelayMax: 4000,
+    timeout: 15000,
+  });
   const track = new window.Track($('track'));
   window.RoachArt.startHeroRoach($('hero'));
 
@@ -91,7 +116,7 @@
     }
     showLoginError('');
     store.set('nick', nick);
-    const payload = { nick, mode, code };
+    const payload = { nick, mode, code, sessionToken };
     if (mode === 'create') payload.name = $('roomName').value.trim();
     socket.emit('join', payload, (res) => {
       if (!res || res.error) {
@@ -99,8 +124,8 @@
         return;
       }
       me = { id: res.you, nick: res.nick };
-      // auto - быстрый общий заезд (вернёмся в любой свободный), иначе держимся за код комнаты
-      joined = res.auto ? { mode: 'quick', nick } : { mode: 'code', code: res.code, nick };
+      // Даже при быстром заезде восстанавливаем ту же комнату, а не случайную новую.
+      joined = { mode: 'resume', code: res.code, nick, sessionToken };
       history.replaceState(null, '', res.auto ? location.pathname : `?room=${res.code}`);
       showScreen('race');
     });
@@ -232,13 +257,28 @@
   socket.on('connect', () => {
     $('offline').hidden = true;
     if (joined) {
-      // переподключились - встаём обратно в ту же комнату
-      socket.emit('join', { nick: joined.nick, mode: joined.mode, code: joined.code }, (res) => {
-        if (res && res.ok) me = { id: res.you, nick: res.nick };
+      // Восстановление того же места и прогресса без создания нового игрока.
+      socket.emit('join', joined, (res) => {
+        if (res && res.ok) {
+          me = { id: res.you, nick: res.nick };
+          console.info('[Сеть] Комната восстановлена:', res.code, 'прежний игрок:', !!res.resumed);
+        } else {
+          joined = null;
+          room = null;
+          resetTyping();
+          history.replaceState(null, '', location.pathname);
+          showScreen('login');
+          showLoginError(res && res.error ? res.error : 'Не удалось восстановить соединение. Войди заново.');
+        }
       });
     }
   });
-  socket.on('disconnect', () => {
+  socket.on('disconnect', (reason) => {
+    console.warn('[Сеть] Соединение прервалось:', reason);
+    if (joined) $('offline').hidden = false;
+  });
+  socket.on('connect_error', (err) => {
+    console.warn('[Сеть] Ошибка подключения:', err.message, err.description || '');
     if (joined) $('offline').hidden = false;
   });
 
@@ -300,7 +340,7 @@
   }
 
   function canType() {
-    if (!room || !text || gaveUp) return false;
+    if (!socket.connected || !room || !text || gaveUp) return false;
     const mine = myPlayer();
     if (!mine || mine.spectator || mine.finished || pos >= text.length) return false;
     if (room.state === 'racing') return true;
@@ -558,12 +598,13 @@
             .map((b) => `<span class="tag">${b}</span>`)
             .join('');
           const ready = p.bot ? true : p.ready;
+          const online = p.connected !== false;
           const kick = isHost && !you ? `<button type="button" class="kick" title="Выгнать" data-kick="${p.id}">✕</button>` : '';
           return (
             `<li class="${you ? 'you' : ''}">` +
             `<span class="s-dot" style="background:${p.color}"></span>` +
             `<span class="l-nick">${escapeHtml(p.nick)} ${badges}</span>` +
-            `<span class="l-ready ${ready ? 'on' : ''}">${ready ? 'готов' : '…'}</span>` +
+            `<span class="l-ready ${ready && online ? 'on' : ''}">${online ? (ready ? 'готов' : '…') : 'нет связи'}</span>` +
             kick +
             `</li>`
           );
