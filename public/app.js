@@ -88,6 +88,7 @@
   let offlineSince = null;
   let offlineNoticeTimer = null;
   let waitingForResyncState = false;
+  let previousSocketId = null;
   let pendingGiveup = false;
 
   function hideOfflineNotice() {
@@ -115,7 +116,8 @@
   }
 
   const serverNow = () => Date.now() + (clockOffset || 0);
-  const myPlayer = () => (room ? room.players.find((p) => p.id === me.id) : null);
+  const myPlayer = () => (room ? room.players.find((p) => p.id === me.id)
+    || (previousSocketId ? room.players.find((p) => p.id === previousSocketId) : null) : null);
 
   // ---------- Вход ----------
   const nickInput = $('nick');
@@ -149,6 +151,7 @@
         return;
       }
       me = { id: res.you, nick: res.nick };
+      previousSocketId = null;
       connectionReady = true;
       offlineSince = null;
       hideOfflineNotice();
@@ -295,6 +298,7 @@
     socket.emit('join', joined, (res) => {
       if (res && res.ok) {
         const oldId = me.id;
+        previousSocketId = oldId;
         me = { id: res.you, nick: res.nick };
         track.rebindRacer(oldId, res.you);
         connectionReady = true;
@@ -308,6 +312,7 @@
         resetTyping();
         connectionReady = false;
         waitingForResyncState = false;
+        previousSocketId = null;
         offlineSince = null;
         hideOfflineNotice();
         history.replaceState(null, '', location.pathname);
@@ -332,6 +337,7 @@
 
     const prev = room;
     room = s;
+    if (previousSocketId && s.players.some((p) => p.id === me.id)) previousSocketId = null;
     const mine = myPlayer();
 
     const raceBegan = (s.state === 'countdown' || s.state === 'racing') && s.startAt && s.startAt !== raceStartAt;
