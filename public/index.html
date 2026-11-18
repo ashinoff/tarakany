@@ -112,12 +112,13 @@
 
     <p id="spectators" class="spectators"></p>
 
-    <div id="offline" class="offline" role="alert" hidden>Связь с сервером пропала. Переподключаемся…</div>
+    <div id="offline" class="offline" role="status" aria-live="polite" hidden>Связь нестабильна. Продолжай печатать, результат синхронизируется.</div>
   </main>
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="track.js"></script>
-  <script src="app.js"></script>
+  <script src="race-recovery.js"></script>
+<script src="app.js"></script>
   <script src="platform.js"></script>
 </body>
 </html>
