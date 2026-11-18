@@ -380,7 +380,7 @@ io.on('connection', (socket) => {
     }
 
     // После временного обрыва возвращаем прежнего игрока, а не добавляем зрителя.
-    const restored = resumePlayer(room, socket.id, sessionToken);
+    const restored = data.mode === 'resume' ? resumePlayer(room, socket.id, sessionToken) : null;
     if (restored) {
       const oldSocket = io.sockets.sockets.get(restored.previousId);
       if (oldSocket && oldSocket !== socket) {
