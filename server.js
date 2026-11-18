@@ -536,6 +536,8 @@ io.on('connection', (socket) => {
       room.dirty = true;
     }
     if (room.state !== 'racing') return;
+    // Поздний накопленный пакет не должен засчитать символы в следующем заезде.
+    if (data.startAt != null && Number(data.startAt) !== room.startAt) return;
 
     const p = room.players.get(socket.id);
     if (!p || p.spectator || p.finishedAt) return;
