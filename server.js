@@ -6,6 +6,7 @@ const http = require('http');
 const express = require('express');
 const { Server } = require('socket.io');
 const TEXTS = require('./texts');
+const { pickNextText } = require('./text-picker');
 
 // ---------- Настройки ----------
 const PORT = Number(process.env.PORT) || 3000;
@@ -109,6 +110,7 @@ function createRoom(code, opts = {}) {
     hostId: null,
     text: '',
     textIndex: -1,
+    textQueue: [],
     startAt: 0,
     endAt: 0,
     autoStartAt: 0,
@@ -130,12 +132,7 @@ function findPublicRoom() {
 }
 
 function pickText(room) {
-  let i;
-  do {
-    i = Math.floor(Math.random() * TEXTS.length);
-  } while (TEXTS.length > 1 && i === room.textIndex);
-  room.textIndex = i;
-  return TEXTS[i];
+  return pickNextText(room, TEXTS);
 }
 
 function cleanNick(raw) {
