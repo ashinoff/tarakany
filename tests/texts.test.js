@@ -10,7 +10,7 @@ test('в игре есть 200 уникальных текстов на русс
   assert.equal(new Set(TEXTS).size, 200);
   for (const text of TEXTS) {
     assert.ok(text.length >= 150 && text.length <= 260, 'Текст не должен быть слишком коротким или длинным');
-    assert.ok(!/[ёЁ«»“”—–\\n]/.test(text), 'Нет лишних символов и переносов');
+    assert.ok(!/[ёЁ«»“”—–\n]/.test(text), 'Нет лишних символов и переносов');
     assert.ok(!/[A-Za-z]/.test(text), 'Игровой текст набирается на русской раскладке');
   }
 });
