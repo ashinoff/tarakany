@@ -6,12 +6,12 @@
   // Сервер удерживает место 60 секунд; оставляем запас для восстановления.
   const LOCAL_GRACE_MS = 50000;
 
-  function canContinueRace({ room, player, textLength, pos, gaveUp, now, offlineSince }) {
+  function canContinueRace({ room, player, textLength, pos, gaveUp, now, localNow = now, offlineSince }) {
     if (!room || !player || !textLength || gaveUp || pos >= textLength) return false;
     if (player.finished || player.spectator) return false;
     if (room.state !== 'racing' && room.state !== 'countdown') return false;
     if (!room.startAt || !room.endAt || now < room.startAt || now >= room.endAt) return false;
-    if (offlineSince != null && now - offlineSince >= LOCAL_GRACE_MS) return false;
+    if (offlineSince != null && localNow - offlineSince >= LOCAL_GRACE_MS) return false;
     return true;
   }
 
