@@ -40,13 +40,36 @@
     },
   };
 
+  // Ключ только для этой открытой страницы: при временном обрыве сохраняется,
+  // но дублированные вкладки не смогут случайно отобрать чужое место в комнате.
+  const sessionToken = (() => {
+    try {
+      const bytes = new Uint8Array(16);
+      window.crypto.getRandomValues(bytes);
+      return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+    } catch {
+      return null;
+    }
+  })();
+
   const escapeHtml = (s) =>
     String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   // ---------- Состояние ----------
-  // В сокет — токен платформы (сервер проверяет его и берёт ник из ФИО)
-  const socket = io({ autoConnect: false, auth: (cb) => cb({ token: window.RaceAuth.current() }) });
+  // В сокет — токен платформы (сервер проверяет его и берёт ник из ФИО).
+  // WebSocket первым: меньше HTTP-запросов и меньше проблем с балансировкой.
+  // Если WebSocket недоступен, Socket.IO попробует обычный polling.
+  const socket = io({
+    autoConnect: false,
+    auth: (cb) => cb({ token: window.RaceAuth.current() }),
+    transports: ['websocket', 'polling'],
+    tryAllTransports: true,
+    reconnectionDelay: 750,
+    reconnectionDelayMax: 4000,
+    timeout: 15000,
+  });
   const track = new window.Track($('track'));
+  const { canContinueRace, unsyncedProgress, NOTICE_DELAY_MS, LOCAL_GRACE_MS } = window.RaceRecovery;
   window.RoachArt.startHeroRoach($('hero'));
 
   let me = { id: null, nick: '' };
@@ -64,9 +87,40 @@
   let gaveUp = false; // игрок сдался в этом заезде
   let raceStartAt = 0;
   let lastSentPos = 0;
+  let connectionReady = false;
+  let offlineSince = null;
+  let offlineNoticeTimer = null;
+  let waitingForResyncState = false;
+  let previousSocketId = null;
+  let pendingGiveup = false;
+
+  function hideOfflineNotice() {
+    if (offlineNoticeTimer) clearTimeout(offlineNoticeTimer);
+    offlineNoticeTimer = null;
+    delete $('offline').dataset.severe;
+    $('offline').hidden = true;
+  }
+
+  function scheduleOfflineNotice() {
+    if (!joined || offlineNoticeTimer) return;
+    offlineNoticeTimer = setTimeout(() => {
+      offlineNoticeTimer = null;
+      if (!connectionReady && joined) {
+        $('offline').textContent = 'Связь нестабильна. Продолжай печатать, результат синхронизируется.';
+        $('offline').hidden = false;
+      }
+    }, NOTICE_DELAY_MS);
+  }
+
+  function markConnectionLost() {
+    if (offlineSince === null) offlineSince = Date.now();
+    connectionReady = false;
+    scheduleOfflineNotice();
+  }
 
   const serverNow = () => Date.now() + (clockOffset || 0);
-  const myPlayer = () => (room ? room.players.find((p) => p.id === me.id) : null);
+  const myPlayer = () => (room ? room.players.find((p) => p.id === me.id)
+    || (previousSocketId ? room.players.find((p) => p.id === previousSocketId) : null) : null);
 
   // ---------- Вход ----------
   const codeInput = $('code');
@@ -110,7 +164,7 @@
     }
     showLoginError('');
     const nick = me.nick;
-    const payload = { mode, code };
+    const payload = { mode, code, sessionToken };
     if (mode === 'create') payload.name = $('roomName').value.trim();
     socket.emit('join', payload, (res) => {
       if (!res || res.error) {
@@ -118,8 +172,12 @@
         return;
       }
       me = { id: res.you, nick: res.nick };
-      // auto - быстрый общий заезд (вернёмся в любой свободный), иначе держимся за код комнаты
-      joined = res.auto ? { mode: 'quick', nick } : { mode: 'code', code: res.code, nick };
+      previousSocketId = null;
+      connectionReady = true;
+      offlineSince = null;
+      hideOfflineNotice();
+      // Даже при быстром заезде восстанавливаем ту же комнату, а не случайную новую.
+      joined = { mode: sessionToken ? 'resume' : 'code', code: res.code, nick, sessionToken };
       history.replaceState(null, '', res.auto ? location.pathname : `?room=${res.code}`);
       showScreen('race');
     });
@@ -157,7 +215,7 @@
   }
 
   $('leaveBtn').addEventListener('click', () => {
-    socket.emit('leave');
+    if (socket.connected && connectionReady) socket.emit('leave');
     joined = null;
     room = null;
     resetTyping();
@@ -168,7 +226,8 @@
   $('giveupBtn').addEventListener('click', () => {
     if (gaveUp || !room || room.state !== 'racing') return;
     gaveUp = true;
-    socket.emit('giveup');
+    if (socket.connected && connectionReady) socket.emit('giveup');
+    else pendingGiveup = true;
     setHint('Ты сдался. Таракан замер — ждём финиша остальных.');
   });
 
@@ -249,16 +308,47 @@
 
   // ---------- Соединение ----------
   socket.on('connect', () => {
-    $('offline').hidden = true;
-    if (joined) {
-      // переподключились - встаём обратно в ту же комнату
-      socket.emit('join', { mode: joined.mode, code: joined.code }, (res) => {
-        if (res && res.ok) me = { id: res.you, nick: res.nick };
-      });
+    if (!joined) {
+      connectionReady = true;
+      offlineSince = null;
+      hideOfflineNotice();
+      return;
     }
+    // До подтверждения входа нельзя отправлять пачку старых игровых событий.
+    connectionReady = false;
+    socket.emit('join', joined, (res) => {
+      if (res && res.ok) {
+        const oldId = me.id;
+        previousSocketId = oldId;
+        me = { id: res.you, nick: res.nick };
+        track.rebindRacer(oldId, res.you);
+        connectionReady = true;
+        offlineSince = null;
+        waitingForResyncState = true;
+        hideOfflineNotice();
+        console.info('[Сеть] Восстановлен заезд:', res.code, 'сохранено место:', !!res.resumed);
+      } else {
+        joined = null;
+        room = null;
+        resetTyping();
+        connectionReady = false;
+        waitingForResyncState = false;
+        previousSocketId = null;
+        offlineSince = null;
+        hideOfflineNotice();
+        history.replaceState(null, '', location.pathname);
+        showScreen('login');
+        showLoginError(res && res.error ? res.error : 'Не удалось восстановить соединение. Войди заново.');
+      }
+    });
   });
-  socket.on('disconnect', () => {
-    if (joined) $('offline').hidden = false;
+  socket.on('disconnect', (reason) => {
+    console.warn('[Сеть] Соединение прервалось:', reason);
+    if (joined) markConnectionLost();
+  });
+  socket.on('connect_error', (err) => {
+    console.warn('[Сеть] Ошибка подключения:', err.message, err.description || '');
+    if (joined) markConnectionLost();
   });
 
   socket.on('state', (s) => {
@@ -268,6 +358,7 @@
 
     const prev = room;
     room = s;
+    if (previousSocketId && s.players.some((p) => p.id === me.id)) previousSocketId = null;
     const mine = myPlayer();
 
     const raceBegan = (s.state === 'countdown' || s.state === 'racing') && s.startAt && s.startAt !== raceStartAt;
@@ -281,6 +372,25 @@
     track.setRace(lane, me.id, s.state === 'waiting' ? 1 : s.text.length);
     track.setPhase(s.state); // трибуны реагируют на отсчёт, старт и финиш
     if (mine && !mine.spectator && s.state !== 'waiting') track.setProgress(me.id, pos);
+
+    // После переподключения сервер может еще не знать о буквах,
+    // набранных локально. Отправляем только актуальный итог текущей гонки.
+    if (waitingForResyncState) {
+      waitingForResyncState = false;
+      if (s.startAt === raceStartAt && (s.state === 'racing' || s.state === 'countdown')) {
+        if (pendingGiveup) {
+          socket.emit('giveup');
+          pendingGiveup = false;
+        } else {
+          sendProgress(true);
+        }
+      } else if (s.startAt === raceStartAt && s.state === 'finished' && mine && pos > mine.progress) {
+        // Финиш уже закрыт: не показываем неподтвержденное сервером место.
+        pos = mine.progress;
+        errors = Math.max(errors, mine.errors);
+        setHint('Заезд завершился во время обрыва. Результат подтвержден сервером.');
+      }
+    }
 
     renderHeader();
     renderPanels();
@@ -300,6 +410,7 @@
     errors = 0;
     gaveUp = false;
     lastSentPos = 0;
+    pendingGiveup = false;
     newQuip();
     track.resetPositions();
     setHint('');
@@ -315,15 +426,15 @@
     gaveUp = false;
     raceStartAt = 0;
     lastSentPos = 0;
+    pendingGiveup = false;
     setHint('');
   }
 
   function canType() {
-    if (!room || !text || gaveUp) return false;
-    const mine = myPlayer();
-    if (!mine || mine.spectator || mine.finished || pos >= text.length) return false;
-    if (room.state === 'racing') return true;
-    return room.state === 'countdown' && serverNow() >= room.startAt;
+    return canContinueRace({
+      room, player: myPlayer(), textLength: text.length, pos, gaveUp,
+      now: serverNow(), localNow: Date.now(), offlineSince: connectionReady ? null : offlineSince,
+    });
   }
 
   // "е" и "ё" считаем одной буквой
@@ -343,7 +454,7 @@
       errAt = false;
       setHint('');
       track.setProgress(me.id, pos);
-      sendProgress();
+      sendProgress(pos >= text.length);
     } else {
       // неверная буква - курсор НЕ двигается, стоит на той же букве, пока не нажмут верную
       if (!errAt) {
@@ -370,17 +481,25 @@
     renderText();
   }
 
-  function sendProgress() {
+  function sendProgress(reliable = false) {
+    const snapshot = unsyncedProgress({
+      room, player: myPlayer(), pos, errors, raceStartAt,
+      connected: socket.connected, ready: connectionReady,
+    });
+    if (!snapshot) return;
     lastSentPos = pos;
-    socket.emit('progress', { pos, errors });
+    // Во время обычного набора не создаем очередь из сотен пакетов.
+    // При восстановлении и на финише отправляем надежное сводное состояние.
+    if (reliable) socket.emit('progress', snapshot);
+    else socket.volatile.emit('progress', snapshot);
   }
 
-  // страховка: если пакет потерялся при переподключении - повторим
+  // Подстраховка при потерянных пакетах: локальное положение не сбрасываем.
   setInterval(() => {
-    if (!room || room.state !== 'racing') return;
+    if (!connectionReady || !socket.connected || !room || room.state !== 'racing') return;
     const mine = myPlayer();
-    if (mine && !mine.spectator && pos > 0 && mine.progress < pos) socket.emit('progress', { pos, errors });
-  }, 1000);
+    if (mine && !mine.spectator && (pos > mine.progress || errors > mine.errors)) sendProgress();
+  }, 800);
 
   // ---------- Ввод ----------
   const input = $('typeInput');
@@ -577,12 +696,13 @@
             .map((b) => `<span class="tag">${b}</span>`)
             .join('');
           const ready = p.bot ? true : p.ready;
+          const online = p.connected !== false;
           const kick = isHost && !you ? `<button type="button" class="kick" title="Выгнать" data-kick="${p.id}">✕</button>` : '';
           return (
             `<li class="${you ? 'you' : ''}">` +
             `<span class="s-dot" style="background:${p.color}"></span>` +
             `<span class="l-nick">${escapeHtml(p.nick)} ${badges}</span>` +
-            `<span class="l-ready ${ready ? 'on' : ''}">${ready ? 'готов' : '…'}</span>` +
+            `<span class="l-ready ${ready && online ? 'on' : ''}">${online ? (ready ? 'готов' : '…') : 'нет связи'}</span>` +
             kick +
             `</li>`
           );
@@ -736,7 +856,7 @@
       .map((p, i) => {
         const you = p.id === me.id;
         let val = '';
-        if (racing) val = Math.round((100 * (p.progress || 0)) / Math.max(1, len)) + '%';
+        if (racing) val = Math.round((100 * (p.id === me.id ? Math.max(p.progress || 0, pos) : (p.progress || 0))) / Math.max(1, len)) + '%';
         else if (room.state === 'finished') val = p.dnf ? 'сошёл' : (p.place ? '#' + p.place : '');
         else if (waiting) val = (p.bot || p.ready) ? '✓' : '';
         const rank = waiting ? '' : i + 1;
@@ -778,6 +898,11 @@
     if (room.state === 'racing') {
       updateStats();
       renderStandings();
+    }
+    if (joined && !connectionReady && offlineSince !== null && Date.now() - offlineSince >= LOCAL_GRACE_MS) {
+      $('offline').dataset.severe = 'true';
+      $('offline').textContent = 'Слишком долгий обрыв: ввод приостановлен, место в заезде может быть потеряно.';
+      $('offline').hidden = false;
     }
   }
   setInterval(tickUi, 100);

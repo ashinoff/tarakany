@@ -8,6 +8,8 @@ const { Server } = require('socket.io');
 const TEXTS = require('./texts');
 const { identify, AuthError, AUTH_DISABLED } = require('./lib/auth');
 const { createStore } = require('./lib/store');
+const { pickNextText } = require('./text-picker');
+const { VALID_TOKEN, cancelDisconnect, markDisconnected, resumePlayer } = require('./room-session');
 
 // ---------- Настройки ----------
 const PORT = Number(process.env.PORT) || 3000;
@@ -62,7 +64,14 @@ app.get('/api/me', authed(async (user) => ({ ...user, storage: store.kind, devAu
 app.get('/api/races/mine', authed((user) => store.myResults(user.id)));
 
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  // На занятых устройствах даем немного больше времени на ответ PING.
+  pingInterval: 25000,
+  pingTimeout: 30000,
+});
+io.engine.on('connection_error', (err) => {
+  console.warn('[engine.io] Ошибка соединения:', err.code, err.message);
+});
 
 // Сокет пускаем только с проверенным пользователем платформы: ник берётся из ФИО
 io.use(async (socket, next) => {
@@ -103,6 +112,7 @@ function createRoom(code, opts = {}) {
     hostId: null,
     text: '',
     textIndex: -1,
+    textQueue: [],
     startAt: 0,
     endAt: 0,
     autoStartAt: 0,
@@ -124,12 +134,7 @@ function findPublicRoom() {
 }
 
 function pickText(room) {
-  let i;
-  do {
-    i = Math.floor(Math.random() * TEXTS.length);
-  } while (TEXTS.length > 1 && i === room.textIndex);
-  room.textIndex = i;
-  return TEXTS[i];
+  return pickNextText(room, TEXTS);
 }
 
 function cleanNick(raw) {
@@ -281,6 +286,7 @@ function roomState(room) {
     serverNow: Date.now(),
     players: [...room.players.values()].map((p) => ({
       id: p.id,
+      connected: p.connected !== false,
       nick: p.nick,
       color: p.color,
       bot: Boolean(p.bot),
@@ -313,6 +319,8 @@ function leaveRoom(socket) {
   socket.leave(code);
   const room = rooms.get(code);
   if (!room) return;
+  const leaving = room.players.get(socket.id);
+  if (leaving) cancelDisconnect(leaving);
   room.players.delete(socket.id);
   // если людей не осталось - комнату (вместе с ботами) закрываем
   if (humans(room).length === 0) {
@@ -328,6 +336,10 @@ function leaveRoom(socket) {
 
 // ---------- Сокеты ----------
 io.on('connection', (socket) => {
+  console.info('[socket.io] подключение', socket.id, 'транспорт', socket.conn.transport.name);
+  socket.conn.on('upgrade', (transport) => {
+    console.info('[socket.io] переключение транспорта', socket.id, transport.name);
+  });
   socket.emit('records', topRecords());
   socket.emit('rooms', publicRooms());
 
@@ -339,11 +351,17 @@ io.on('connection', (socket) => {
     leaveRoom(socket);
 
     const nick = cleanNick(socket.data.user.nick) || 'Таракан';
+    const sessionToken = VALID_TOKEN.test(data.sessionToken || '') ? data.sessionToken : null;
 
     let room;
     if (data.mode === 'create') {
       const name = cleanRoomName(data.name) || `Комната ${nick}`;
       room = createRoom(genCode(), { isPrivate: false, auto: false, name });
+    } else if (data.mode === 'resume') {
+      // Не создаем пустую комнату при восстановлении: старый сервер мог перезапуститься.
+      const code = String(data.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      room = rooms.get(code);
+      if (!room) return reply({ error: 'Прежняя комната больше не существует. Создай новый заезд.' });
     } else if (data.mode === 'code') {
       const code = String(data.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
       if (code.length < 3 || code.length > 8) {
@@ -354,6 +372,30 @@ io.on('connection', (socket) => {
       room = findPublicRoom();
     }
 
+    // После временного обрыва возвращаем прежнего игрока, а не добавляем зрителя.
+    const restored = data.mode === 'resume' ? resumePlayer(room, socket.id, sessionToken) : null;
+    if (restored) {
+      const oldSocket = io.sockets.sockets.get(restored.previousId);
+      if (oldSocket && oldSocket !== socket) {
+        oldSocket.data.roomCode = null;
+        oldSocket.leave(room.code);
+        oldSocket.disconnect(true);
+      }
+      socket.data.roomCode = room.code;
+      socket.join(room.code);
+      room.dirty = true;
+      lobbyDirty = true;
+      reply({
+        ok: true, resumed: true, you: socket.id, code: room.code, name: room.name,
+        nick: restored.player.nick, isPrivate: room.isPrivate, auto: room.auto,
+      });
+      socket.emit('state', roomState(room));
+      console.info('[socket.io] игрок восстановлен', room.code, socket.id);
+      return;
+    }
+    if (data.mode === 'resume') {
+      return reply({ error: 'Место в комнате уже недоступно. Зайди в новый заезд.' });
+    }
     if (room.players.size >= MAX_PLAYERS) {
       return reply({ error: `В этой комнате уже ${MAX_PLAYERS} тараканов. Создайте свою или зайдите в общий заезд.` });
     }
@@ -365,6 +407,8 @@ io.on('connection', (socket) => {
       color: freeColor(room),
       bot: false,
       ready: false,
+      connected: true,
+      sessionToken,
       spectator: room.state !== 'waiting', // пришёл посреди заезда - бежит в следующем
     };
     resetPlayer(player);
@@ -486,6 +530,8 @@ io.on('connection', (socket) => {
       room.dirty = true;
     }
     if (room.state !== 'racing') return;
+    // Поздний накопленный пакет не должен засчитать символы в следующем заезде.
+    if (data.startAt != null && Number(data.startAt) !== room.startAt) return;
 
     const p = room.players.get(socket.id);
     if (!p || p.spectator || p.finishedAt) return;
@@ -516,7 +562,20 @@ io.on('connection', (socket) => {
     leaveRoom(socket);
     socket.emit('rooms', publicRooms());
   });
-  socket.on('disconnect', () => leaveRoom(socket));
+  socket.on('disconnect', (reason) => {
+    const code = socket.data.roomCode;
+    const room = rooms.get(code);
+    console.warn('[socket.io] отключение', socket.id, 'комната', code || '-', 'причина', reason);
+    if (!room) return;
+    if (reason === 'client namespace disconnect' || reason === 'server namespace disconnect') {
+      leaveRoom(socket);
+      return;
+    }
+    if (markDisconnected(room, socket.id, () => leaveRoom(socket))) {
+      room.dirty = true;
+      lobbyDirty = true;
+    }
+  });
 });
 
 // ---------- Игровой цикл ----------

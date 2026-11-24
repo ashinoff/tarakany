@@ -1382,6 +1382,18 @@
       this.crowdFresh = false;
     }
 
+    // Socket.IO меняет идентификатор после переподключения.
+    // Переносим сам объект бегуна, чтобы он не телепортировался на старт.
+    rebindRacer(oldId, newId) {
+      if (!oldId || !newId || oldId === newId || !this.racers.has(oldId)) return;
+      const runner = this.racers.get(oldId);
+      this.racers.delete(oldId);
+      runner.id = newId;
+      this.racers.set(newId, runner);
+      this.order = this.order.map((id) => id === oldId ? newId : id);
+      if (this.youId === oldId) this.youId = newId;
+    }
+
     // players: [{id, nick, color, progress, place, finished}]
     setRace(players, youId, textLen) {
       this.youId = youId;
