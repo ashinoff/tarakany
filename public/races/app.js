@@ -44,7 +44,8 @@
     String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
   // ---------- Состояние ----------
-  const socket = io();
+  // В сокет — токен платформы (сервер проверяет его и берёт ник из ФИО)
+  const socket = io({ autoConnect: false, auth: (cb) => cb({ token: window.RaceAuth.current() }) });
   const track = new window.Track($('track'));
   window.RoachArt.startHeroRoach($('hero'));
 
@@ -68,9 +69,29 @@
   const myPlayer = () => (room ? room.players.find((p) => p.id === me.id) : null);
 
   // ---------- Вход ----------
-  const nickInput = $('nick');
   const codeInput = $('code');
-  nickInput.value = store.get('nick') || '';
+  const nickLabel = $('meNick');
+
+  // Кто бежит: ФИО из входа в платформу (сервер проверяет токен)
+  window.RaceAuth.token().then(async (token) => {
+    try {
+      const r = await fetch('/api/me', { headers: window.RaceAuth.headers() });
+      const body = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(body.error || 'Не удалось войти.');
+      me.nick = body.nick;
+      nickLabel.textContent = body.nick;
+      socket.connect();
+    } catch (e) {
+      nickLabel.textContent = '—';
+      showLoginError(token || window.RaceAuth.embedded ? e.message : 'Открой «Развитие» через платформу — бежать можно только под своей учётной записью.');
+    }
+  });
+  // Платформа продлила вход — следующий переподключившийся сокет возьмёт новый токен
+  window.RaceAuth.onToken(() => { if (!socket.connected && me.nick) socket.connect(); });
+  socket.on('connect_error', (err) => {
+    showLoginError(err && err.message ? err.message : 'Нет связи с сервером.');
+    window.RaceAuth.refresh();
+  });
 
   const urlRoom = (new URLSearchParams(location.search).get('room') || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (urlRoom) {
@@ -83,15 +104,13 @@
   }
 
   function join(mode, code) {
-    const nick = nickInput.value.trim();
-    if (!nick) {
-      showLoginError('Введи ник, чтобы встать на старт.');
-      nickInput.focus();
+    if (!socket.connected) {
+      showLoginError('Подключаемся к трассе… Ещё секунду.');
       return;
     }
     showLoginError('');
-    store.set('nick', nick);
-    const payload = { nick, mode, code };
+    const nick = me.nick;
+    const payload = { mode, code };
     if (mode === 'create') payload.name = $('roomName').value.trim();
     socket.emit('join', payload, (res) => {
       if (!res || res.error) {
@@ -233,7 +252,7 @@
     $('offline').hidden = true;
     if (joined) {
       // переподключились - встаём обратно в ту же комнату
-      socket.emit('join', { nick: joined.nick, mode: joined.mode, code: joined.code }, (res) => {
+      socket.emit('join', { mode: joined.mode, code: joined.code }, (res) => {
         if (res && res.ok) me = { id: res.you, nick: res.nick };
       });
     }

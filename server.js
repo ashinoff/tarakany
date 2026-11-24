@@ -6,6 +6,8 @@ const http = require('http');
 const express = require('express');
 const { Server } = require('socket.io');
 const TEXTS = require('./texts');
+const { identify, AuthError, AUTH_DISABLED } = require('./lib/auth');
+const { createStore } = require('./lib/store');
 
 // ---------- Настройки ----------
 const PORT = Number(process.env.PORT) || 3000;
@@ -19,7 +21,7 @@ const FULL_ROOM_START_MS = 4000;// ...или почти сразу, если к�
 const RESULTS_MS = 12000;       // сколько показываем результаты
 const TICK_MS = 100;            // шаг игрового цикла
 const MAX_CPS = 25;             // быстрее 25 знаков/сек (1500 зн/мин) - явный чит
-const NICK_MAX = 16;
+const NICK_MAX = 24;   // ник — ФИО из платформы: «Иванов И.И.»
 const ROOM_NAME_MAX = 22;
 
 const COLORS = ['#d64532', '#2f6fde', '#e3a512', '#2f9e63', '#8d4bc4', '#e2702c', '#14a0a0', '#d6457a'];
@@ -33,43 +35,11 @@ const BOT_LEVELS = {
 };
 const BOT_NAMES = ['Шустрик', 'Тапкобой', 'Усатый', 'Прусак', 'Рыжик', 'Дусти', 'Форсаж', 'Крошка', 'Турбо', 'Жужик'];
 
-// ---------- Рекорды (лежат в постоянном хранилище /data на Amvera) ----------
-let records = [];
-try {
-  records = JSON.parse(fs.readFileSync(RECORDS_FILE, 'utf8'));
-  if (!Array.isArray(records)) records = [];
-} catch {
-  records = [];
-}
-
-let saveTimer = null;
-function saveRecords() {
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    fs.mkdir(DATA_DIR, { recursive: true }, (err) => {
-      if (err) return console.error('Не удалось создать папку данных:', err.message);
-      const tmp = RECORDS_FILE + '.tmp';
-      fs.writeFile(tmp, JSON.stringify(records), (e) => {
-        if (e) return console.error('Не удалось сохранить рекорды:', e.message);
-        fs.rename(tmp, RECORDS_FILE, () => {});
-      });
-    });
-  }, 1000);
-}
-
-function submitRecord(nick, cpm, acc) {
-  const key = nick.toLowerCase();
-  const existing = records.find((r) => r.key === key);
-  if (existing && existing.cpm >= cpm) return false;
-  if (existing) Object.assign(existing, { nick, cpm, acc, at: Date.now() });
-  else records.push({ key, nick, cpm, acc, at: Date.now() });
-  records.sort((a, b) => b.cpm - a.cpm);
-  records = records.slice(0, 100);
-  saveRecords();
-  return true;
-}
-
-const topRecords = () => records.slice(0, 10).map(({ nick, cpm, acc }) => ({ nick, cpm, acc }));
+// ---------- Пользователи и результаты (Postgres при DATABASE_URL, иначе файл) ----------
+const store = createStore({ databaseUrl: process.env.DATABASE_URL, dataDir: DATA_DIR });
+let recordsCache = [];
+const refreshRecords = async () => { recordsCache = await store.records(10); return recordsCache; };
+const topRecords = () => recordsCache;
 
 // ---------- HTTP ----------
 const app = express();
@@ -77,8 +47,32 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.get('/health', (req, res) => res.send('ok'));
 app.get('/api/records', (req, res) => res.json(topRecords()));
 
+// Пользователь платформы по токену (заголовок Authorization: Bearer …)
+const authed = (fn) => async (req, res) => {
+  try {
+    const user = await store.user(await identify(req.get('authorization')));
+    res.json(await fn(user, req));
+  } catch (e) {
+    if (e instanceof AuthError) return res.status(401).json({ error: e.message });
+    console.error(e);
+    res.status(500).json({ error: 'Ошибка сервера. Попробуй ещё раз.' });
+  }
+};
+app.get('/api/me', authed(async (user) => ({ ...user, storage: store.kind, devAuth: AUTH_DISABLED })));
+app.get('/api/races/mine', authed((user) => store.myResults(user.id)));
+
 const server = http.createServer(app);
 const io = new Server(server);
+
+// Сокет пускаем только с проверенным пользователем платформы: ник берётся из ФИО
+io.use(async (socket, next) => {
+  try {
+    socket.data.user = await store.user(await identify(socket.handshake.auth && socket.handshake.auth.token));
+    next();
+  } catch (e) {
+    next(new Error(e instanceof AuthError ? e.message : 'Сервер не смог проверить вход. Обнови страницу.'));
+  }
+});
 
 // ---------- Комнаты ----------
 const rooms = new Map();
@@ -344,8 +338,7 @@ io.on('connection', (socket) => {
     data = data || {};
     leaveRoom(socket);
 
-    const nick = cleanNick(data.nick);
-    if (!nick) return reply({ error: 'Введите ник: от 1 до 16 символов.' });
+    const nick = cleanNick(socket.data.user.nick) || 'Таракан';
 
     let room;
     if (data.mode === 'create') {
@@ -367,6 +360,7 @@ io.on('connection', (socket) => {
 
     const player = {
       id: socket.id,
+      userId: socket.data.user.id,
       nick: uniqueNick(room, nick),
       color: freeColor(room),
       bot: false,
@@ -511,7 +505,9 @@ io.on('connection', (socket) => {
       p.time = now - room.startAt;
       p.cpm = Math.round(pos / (p.time / 60000));
       p.acc = Math.round((1000 * pos) / (pos + p.errors)) / 10;
-      if (submitRecord(p.nick, p.cpm, p.acc)) io.emit('records', topRecords());
+      store.saveResult({ userId: p.userId, nick: p.nick, cpm: p.cpm, acc: p.acc, timeMs: p.time, chars: pos, place: p.place, racers: racers(room).length, room: room.auto ? null : room.code })
+        .then(refreshRecords).then((list) => io.emit('records', list))
+        .catch((e) => console.error('Не удалось сохранить результат:', e.message));
     }
     room.dirty = true;
   });
@@ -553,6 +549,9 @@ setInterval(() => {
   }
 }, TICK_MS);
 
-server.listen(PORT, () => {
-  console.log(`Тараканьи бега запущены на порту ${PORT}`);
+store.init().then(refreshRecords).then(() => {
+  server.listen(PORT, () => console.log(`Развитие запущено на порту ${PORT} (хранилище: ${store.kind}${AUTH_DISABLED ? ', вход без платформы' : ''})`));
+}).catch((e) => {
+  console.error('Не удалось подключиться к базе:', e.message);
+  process.exit(1);
 });

@@ -13,6 +13,8 @@
   },
   "dependencies": {
     "express": "^4.21.2",
+    "jose": "^5.10.0",
+    "pg": "^8.23.1",
     "socket.io": "^4.8.1"
   }
 }

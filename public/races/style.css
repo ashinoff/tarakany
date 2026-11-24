@@ -595,3 +595,10 @@ p { margin: 0; }
   .count.pop, .text-box.shake { animation: none; }
   .btn { transition: none; }
 }
+
+/* Ник — ФИО из входа в платформу, вместо поля ввода */
+.me-line { margin: 0 0 4px; font-size: 15px; }
+.me-line b { font-family: 'Unbounded', sans-serif; font-weight: 600; }
+
+/* Внутри оболочки «Развитие»: заголовок и иллюстрация бегов — уже в шапке раздела */
+.in-shell #login > header.whitewash, .in-shell #hero { display: none; }
