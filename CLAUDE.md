@@ -46,7 +46,7 @@
 - Под трассой `.race-panel`: табло слева, текст справа; на телефоне текст сразу под трассой, окно в 3 строки само прокручивается за курсором.
 - Мобильный ввод: скрытое поле, символы определяются сравнением старого и нового значения поля (Android набирает слово «составом»).
 - Встраивание в Платформу (web-desktop, репозиторий SUE_system, `sue-system-2-ashinoff.waw0.amvera.tech`): игра открывается в iframe. `public/platform.js` (только внутри iframe) шлёт родителю `{type:'app-ready'}`, принимает `{type:'platform-auth', token}` только от `window.parent` с адреса из `PLATFORM_ORIGINS` и подставляет имя из токена в пустой ник («Иван П.»). Подпись токена не проверяется: прав в игре нет, нужен только ник. Сменился адрес платформы — поправь `PLATFORM_ORIGINS`.
-- Деплой: проект Amvera `tarakan-race-2` (waw0) не связан с GitHub, у него свой git (свои `amvera.yml` и `texts.js`). Пуш в GitHub его не пересобирает: изменённые файлы заливают в git Amvera и пересобирают проект.
+- Деплой (с 2026-11-24): проект Amvera **`razvitie` (msk1)**, `https://razvitie-ashinoff.msk1.amvera.tech`, тариф «Начальный». Свой git Amvera (не GitHub): файлы заливаются через MCP uploadFiles (fileText) + rebuildProject. База — `siz-control-db` (хост `cnpg-siz-control-db-rw`, база sizcontrol, схема `razvitie`), переменная `DATABASE_URL` (секрет). Старый `tarakan-race-2` (waw0) — прежняя версия без базы.
 - `texts.js` массив текстов. Правила: без «ё», без длинного тире и кавычек-ёлочек, одна строка.
 
 ## Соглашения
