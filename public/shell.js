@@ -28,35 +28,54 @@
   };
 
 
-  // Иллюстрации разделов (как картинки модулей в ЭнергоСфере): светлые фигуры на цвете раздела
+  // Иллюстрации разделов — глянцевые, с градиентами и бликами (по макету владельца)
   const ART = {
-    races: `<svg viewBox="0 0 240 200"><rect x="8" y="120" width="224" height="64" rx="16" fill="#fff" opacity=".14"/>
-      <path d="M20 152h200" stroke="#fff" stroke-opacity=".45" stroke-width="3" stroke-dasharray="12 10"/>
-      <path d="M196 54v126" stroke="#fff" stroke-width="5" stroke-linecap="round"/>
-      <g fill="#fff"><rect x="198" y="56" width="12" height="10"/><rect x="222" y="56" width="12" height="10"/><rect x="210" y="66" width="12" height="10"/><rect x="198" y="76" width="12" height="10"/><rect x="222" y="76" width="12" height="10"/></g>
-      <g fill="#10241a" fill-opacity=".85"><rect x="210" y="56" width="12" height="10"/><rect x="198" y="66" width="12" height="10"/><rect x="222" y="66" width="12" height="10"/><rect x="210" y="76" width="12" height="10"/></g>
-      <path d="M40 126h26M30 140h30M44 112h18" stroke="#fff" stroke-opacity=".6" stroke-width="4" stroke-linecap="round"/>
-      <g transform="translate(118 126) rotate(90)">
-        <path d="M-6-30c-4-10-12-16-22-18M6-30c4-10 12-16 22-18" stroke="#2b190e" stroke-width="3" fill="none" stroke-linecap="round"/>
-        <path d="M-12-6l-20-8M12-6l20-8M-13 6h-22M13 6h22M-12 18l-18 12M12 18l18 12" stroke="#2b190e" stroke-width="4" stroke-linecap="round"/>
-        <ellipse cx="0" cy="-22" rx="9" ry="8" fill="#3a2212"/><ellipse cx="0" cy="8" rx="16" ry="26" fill="#7b4a2a"/>
-        <path d="M0-16v50" stroke="#4a2a15" stroke-width="2.5"/><ellipse cx="-6" cy="0" rx="4" ry="12" fill="#b07b4c" opacity=".6"/></g>
-      <circle cx="62" cy="58" r="16" fill="#f2b632"/><circle cx="62" cy="58" r="11" fill="none" stroke="#a8700f" stroke-width="2.5"/>
-      <path d="M150 30l4 9 9 4-9 4-4 9-4-9-9-4 9-4z" fill="#fff" opacity=".8"/></svg>`,
-    tests: `<svg viewBox="0 0 240 200"><rect x="60" y="22" width="120" height="160" rx="16" fill="#fff"/>
-      <rect x="92" y="12" width="56" height="24" rx="8" fill="#ffd27a"/><circle cx="120" cy="24" r="5" fill="#fff"/>
-      <g stroke-linecap="round" stroke-linejoin="round" stroke-width="7" fill="none"><path d="M80 66l9 9 16-18" stroke="#2bb673"/><path d="M80 106l9 9 16-18" stroke="#2bb673"/><path d="M82 140l18 18M100 140l-18 18" stroke="#ef5b4b"/></g>
-      <g stroke="#c9cfe8" stroke-width="7" stroke-linecap="round"><path d="M118 68h44M118 108h44M118 150h30"/></g>
-      <g transform="translate(188 118) rotate(35)"><rect x="-8" y="-50" width="16" height="78" rx="4" fill="#ffb15c"/><path d="M-8 28h16l-8 18z" fill="#f6e2c4"/><path d="M-3 40h6l-3 6z" fill="#2b2b2b"/><rect x="-8" y="-58" width="16" height="10" rx="3" fill="#ef8fa0"/></g>
-      <circle cx="52" cy="150" r="24" fill="#f2b632"/><path d="M52 136l4.5 9.2 10.1 1.5-7.3 7.1 1.7 10-9-4.7-9 4.7 1.7-10-7.3-7.1 10.1-1.5z" fill="#fff4c9"/></svg>`,
-    tasks: `<svg viewBox="0 0 240 200"><circle cx="104" cy="104" r="76" fill="#fff" opacity=".95"/><circle cx="104" cy="104" r="56" fill="#ffd2a8"/>
-      <circle cx="104" cy="104" r="36" fill="#fff"/><circle cx="104" cy="104" r="16" fill="#e2711d"/>
-      <path d="M104 104 196 30" stroke="#5a2a07" stroke-width="7" stroke-linecap="round"/><path d="M184 20l20 4-6 22-10-8z" fill="#5a2a07"/>
-      <g><ellipse cx="200" cy="176" rx="24" ry="8" fill="#a8700f"/><rect x="176" y="150" width="48" height="26" fill="#f2b632"/><ellipse cx="200" cy="150" rx="24" ry="8" fill="#ffd96b"/>
-      <ellipse cx="200" cy="146" rx="24" ry="8" fill="#a8700f"/><rect x="176" y="126" width="48" height="20" fill="#f2b632"/><ellipse cx="200" cy="126" rx="24" ry="8" fill="#ffe28f"/></g>
-      <path d="M30 40l4 9 9 4-9 4-4 9-4-9-9-4 9-4z" fill="#fff"/></svg>`,
-    admin: `<svg viewBox="0 0 240 200"><path d="M120 18l70 26v52c0 46-30 76-70 90-40-14-70-44-70-90V44z" fill="#f2b632" opacity=".18"/>
-      <path d="M120 18l70 26v52c0 46-30 76-70 90-40-14-70-44-70-90V44z" fill="none" stroke="#f2b632" stroke-width="6" stroke-linejoin="round"/>
+    races: `<svg viewBox="0 0 240 200"><defs>
+        <linearGradient id="rTrack" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".55"/><stop offset="1" stop-color="#fff" stop-opacity=".12"/></linearGradient>
+        <radialGradient id="rBody" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#c98b5a"/><stop offset=".55" stop-color="#7b4a2a"/><stop offset="1" stop-color="#3d2010"/></radialGradient>
+        <radialGradient id="rCoin" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="#fff3b0"/><stop offset=".5" stop-color="#f6c234"/><stop offset="1" stop-color="#b57b0c"/></radialGradient>
+        <linearGradient id="rPole" x1="0" x2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#cfe9db"/></linearGradient></defs>
+      <path d="M26 128h188l14 30H12z" fill="url(#rTrack)" stroke="#fff" stroke-opacity=".6" stroke-width="2" stroke-linejoin="round"/>
+      <path d="M12 158h216v8a6 6 0 0 1-6 6H18a6 6 0 0 1-6-6z" fill="#fff" fill-opacity=".22"/>
+      <path d="M30 146h170" stroke="#fff" stroke-opacity=".75" stroke-width="3.5" stroke-dasharray="11 9" stroke-linecap="round"/>
+      <rect x="182" y="40" width="6" height="118" rx="3" fill="url(#rPole)"/>
+      <g><rect x="188" y="42" width="44" height="30" rx="2" fill="#fff"/>
+        <g fill="#111"><rect x="188" y="42" width="11" height="10"/><rect x="210" y="42" width="11" height="10"/><rect x="199" y="52" width="11" height="10"/><rect x="221" y="52" width="11" height="10"/><rect x="188" y="62" width="11" height="10"/><rect x="210" y="62" width="11" height="10"/></g></g>
+      <path d="M22 100h34M14 114h40M30 86h22" stroke="#fff" stroke-opacity=".85" stroke-width="5" stroke-linecap="round"/>
+      <g transform="translate(112 118)">
+        <path d="M-16-10l-16-14M-6-12l-6-22M10-12l10-20M18-6l20-8M-16 6l-22 6M18 6l22 4M-8 10l-10 18M12 10l12 16" stroke="#3a1f0e" stroke-width="4" stroke-linecap="round" fill="none"/>
+        <path d="M30-6c8-10 14-20 16-30M32 2c12-4 22-12 28-22" stroke="#3a1f0e" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+        <ellipse cx="0" cy="0" rx="26" ry="15" fill="url(#rBody)"/><ellipse cx="28" cy="-1" rx="10" ry="9" fill="#4a2814"/>
+        <path d="M-24 0h46" stroke="#3a1f0e" stroke-opacity=".5" stroke-width="2"/><ellipse cx="-6" cy="-7" rx="13" ry="4" fill="#fff" fill-opacity=".35"/></g>
+      <circle cx="74" cy="56" r="21" fill="url(#rCoin)"/><circle cx="74" cy="56" r="15" fill="none" stroke="#c98a0e" stroke-width="2.5"/><ellipse cx="67" cy="48" rx="7" ry="4" fill="#fff" fill-opacity=".6"/>
+      <path d="M148 22l5 11 11 5-11 5-5 11-5-11-11-5 11-5z" fill="#fff"/></svg>`,
+    tests: `<svg viewBox="0 0 240 200"><defs>
+        <linearGradient id="tPaper" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#e3e8fb"/></linearGradient>
+        <linearGradient id="tClip" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe08a"/><stop offset="1" stop-color="#f3b52e"/></linearGradient>
+        <linearGradient id="tPencil" x1="0" x2="1"><stop offset="0" stop-color="#ffd35c"/><stop offset=".5" stop-color="#ffbf2e"/><stop offset="1" stop-color="#e49b10"/></linearGradient>
+        <radialGradient id="tCoin" cx="35%" cy="30%" r="75%"><stop offset="0" stop-color="#fff3b0"/><stop offset=".5" stop-color="#f6c234"/><stop offset="1" stop-color="#b57b0c"/></radialGradient></defs>
+      <rect x="64" y="24" width="116" height="156" rx="18" fill="url(#tPaper)"/>
+      <rect x="94" y="12" width="56" height="26" rx="9" fill="url(#tClip)"/><circle cx="122" cy="25" r="5" fill="#fff"/>
+      <g stroke-linecap="round" stroke-linejoin="round" stroke-width="8" fill="none"><path d="M84 64l9 9 17-19" stroke="#22b36b"/><path d="M84 104l9 9 17-19" stroke="#22b36b"/><path d="M86 136l18 18M104 136l-18 18" stroke="#f04f45"/></g>
+      <g stroke="#b9c3ea" stroke-width="7" stroke-linecap="round"><path d="M124 66h40M124 106h40M124 146h28"/></g>
+      <g transform="translate(192 118) rotate(38)"><rect x="-9" y="-56" width="18" height="84" rx="4" fill="url(#tPencil)"/><path d="M-9 28h18l-9 20z" fill="#f6dfbd"/><path d="M-3.5 41h7l-3.5 7z" fill="#2b2b2b"/><rect x="-9" y="-66" width="18" height="12" rx="4" fill="#f08aa0"/><rect x="-9" y="-56" width="18" height="5" fill="#c9cdd6"/></g>
+      <path d="M200 20l-6 12M214 30l-12 6M218 46h-12" stroke="#ffd35c" stroke-width="4" stroke-linecap="round"/>
+      <circle cx="56" cy="148" r="27" fill="url(#tCoin)"/><circle cx="56" cy="148" r="20" fill="none" stroke="#c98a0e" stroke-width="2.5"/>
+      <path d="M56 134l4.6 9.4 10.4 1.5-7.5 7.3 1.8 10.3L56 157.6l-9.3 4.9 1.8-10.3-7.5-7.3 10.4-1.5z" fill="#fff6d6"/></svg>`,
+    tasks: `<svg viewBox="0 0 240 200"><defs>
+        <radialGradient id="kRing" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#f3e6da"/></radialGradient>
+        <radialGradient id="kMid" cx="40%" cy="35%" r="70%"><stop offset="0" stop-color="#ffcfa3"/><stop offset="1" stop-color="#f59a52"/></radialGradient>
+        <linearGradient id="kCoin" x1="0" x2="1"><stop offset="0" stop-color="#e9a515"/><stop offset=".45" stop-color="#ffd86a"/><stop offset="1" stop-color="#c88a10"/></linearGradient></defs>
+      <circle cx="104" cy="108" r="76" fill="url(#kRing)"/><circle cx="104" cy="108" r="56" fill="url(#kMid)"/><circle cx="104" cy="108" r="37" fill="#fff"/><circle cx="104" cy="108" r="19" fill="#f2741f"/>
+      <ellipse cx="80" cy="62" rx="26" ry="10" fill="#fff" fill-opacity=".55" transform="rotate(-20 80 62)"/>
+      <path d="M104 108 194 34" stroke="#5a2a07" stroke-width="7" stroke-linecap="round"/><path d="M182 24l22 2-6 22-9-6z" fill="#5a2a07"/>
+      <g><ellipse cx="204" cy="178" rx="26" ry="9" fill="#a8700f"/><rect x="178" y="154" width="52" height="24" fill="url(#kCoin)"/><ellipse cx="204" cy="154" rx="26" ry="9" fill="#ffe28f"/>
+        <ellipse cx="204" cy="150" rx="26" ry="9" fill="#a8700f"/><rect x="178" y="128" width="52" height="22" fill="url(#kCoin)"/><ellipse cx="204" cy="128" rx="26" ry="9" fill="#ffe9a8"/>
+        <path d="M186 136v10M186 160v12" stroke="#fff" stroke-opacity=".7" stroke-width="3" stroke-linecap="round"/></g>
+      <path d="M32 46l5 11 11 5-11 5-5 11-5-11-11-5 11-5z" fill="#fff"/></svg>`,
+    admin: `<svg viewBox="0 0 240 200"><defs><linearGradient id="aGold" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ffe9a0"/><stop offset=".5" stop-color="#f2b632"/><stop offset="1" stop-color="#a8700f"/></linearGradient></defs>
+      <path d="M120 18l70 26v52c0 46-30 76-70 90-40-14-70-44-70-90V44z" fill="#f2b632" opacity=".16"/>
+      <path d="M120 18l70 26v52c0 46-30 76-70 90-40-14-70-44-70-90V44z" fill="none" stroke="url(#aGold)" stroke-width="7" stroke-linejoin="round"/>
       <circle cx="104" cy="98" r="22" fill="none" stroke="#fff" stroke-width="9"/><path d="M124 106l44 24M152 122l-8 14M164 129l-6 10" stroke="#fff" stroke-width="9" stroke-linecap="round"/>
       <path d="M196 40l4 9 9 4-9 4-4 9-4-9-9-4 9-4z" fill="#f2b632"/></svg>`,
   };
@@ -64,7 +83,7 @@
   // ---------- Разделы: глубокие насыщенные цвета, белый текст (концептуально не как пастель ЭнергоСферы) ----------
   const MODULES = [
     {
-      id: 'races', num: '01', title: 'Тараканьи бега', subtitle: 'Скоростная печать\nнаперегонки', icon: ICONS.roach, art: ART.races,
+      id: 'races', num: '01', title: 'Тараканьи бега', subtitle: 'Скоростная печать и соревнование на время.', icon: ICONS.roach, art: ART.races,
       tint: '#14894f', accent: '#3fd08a', strong: '#0a5c33',
       about: 'Печатай текст — и твой таракан бежит. Кто первым без ошибок наберёт весь текст, тот и победил.',
       menu: [
@@ -74,7 +93,7 @@
       ],
     },
     {
-      id: 'tests', num: '02', title: 'Тестирование', subtitle: 'Проверь себя\nи получи монетки', icon: ICONS.test, art: ART.tests, soon: true,
+      id: 'tests', num: '02', title: 'Тестирование', subtitle: 'Проверь знания и получи монетки.', icon: ICONS.test, art: ART.tests, soon: true,
       tint: '#3346c4', accent: '#8293ff', strong: '#1b2683',
       about: 'Тесты по работе: прошёл успешно — на счёт падают монетки.',
       menu: [
@@ -83,7 +102,7 @@
       ],
     },
     {
-      id: 'tasks', num: '03', title: 'Задачи', subtitle: 'Решай задачи\nкопи монетки', icon: ICONS.target, art: ART.tasks, soon: true,
+      id: 'tasks', num: '03', title: 'Задачи', subtitle: 'Решай практические задачи и зарабатывай монетки.', icon: ICONS.target, art: ART.tasks, soon: true,
       tint: '#e2711d', accent: '#ffaa5c', strong: '#8f3f06',
       about: 'Практические задачи: решил — монетки на счёт.',
       menu: [
@@ -173,11 +192,10 @@
       p.innerHTML =
         `<span class="panel__img" aria-hidden="true">${m.art}</span>
          <a class="panel__col" href="#/${m.id}">
-           <span class="panel__num">${m.num}</span>
+           <span class="panel__num panel__pill">${m.num}</span>
            <span class="panel__title">${esc(m.title)}</span>
            <span class="panel__sub">${esc(m.subtitle)}</span>
-           <span class="panel__about">${esc(m.about)}</span>
-           <span class="panel__go">${m.soon ? 'Скоро' : 'Открыть'} <b aria-hidden="true">→</b></span>
+           ${m.soon ? `<span class="panel__go panel__go--soon"><i aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></i>Скоро</span>` : '<span class="panel__go">Открыть <b aria-hidden="true">→</b></span>'}
          </a>
          <a class="panel__strip" href="#/${m.id}" title="${esc(m.title)}"><span class="panel__num">${m.num}</span><span class="panel__spine">${esc(m.title)}</span></a>
          <nav class="panel__side" aria-label="${esc(m.title)}">
@@ -207,8 +225,12 @@
         mode = 'hidden';
         st = narrow ? { left: '0', width: '100%', top: '0', height: '0' } : { left: '100%', width: '0', top: '0', height: '100%' };
       } else if (!sel) {
+        // главная — карточки с отступами (тёмная сцена со свечением)
         mode = 'col';
-        st = narrow ? { left: '0', width: '100%', top: `${(i * 100) / n}%`, height: `${100 / n}%` } : { left: `${(i * 100) / n}%`, width: `${100 / n}%`, top: '0', height: '100%' };
+        const pad = narrow ? 14 : 40, gap = narrow ? 12 : 24;
+        st = narrow
+          ? { left: `${pad}px`, width: `calc(100% - ${2 * pad}px)`, top: `calc(${pad}px + ${i} * ((100% - ${2 * pad + (n - 1) * gap}px) / ${n} + ${gap}px))`, height: `calc((100% - ${2 * pad + (n - 1) * gap}px) / ${n})` }
+          : { left: `calc(${pad}px + ${i} * ((100% - ${2 * pad + (n - 1) * gap}px) / ${n} + ${gap}px))`, width: `calc((100% - ${2 * pad + (n - 1) * gap}px) / ${n})`, top: `${pad}px`, height: `calc(100% - ${2 * pad}px)` };
       } else if (m.id === sel) {
         if (state.focus) { mode = 'hidden'; st = narrow ? { left: '0', width: '100%', top: '0', height: '0' } : { left: '0', width: '0', top: '0', height: '100%' }; }
         else { mode = 'side'; st = narrow ? { left: '0', width: '100%', top: '0', height: `${BAR}px` } : { left: `${stripsW}px`, width: `${SIDE}px`, top: '0', height: '100%' }; }
@@ -227,6 +249,7 @@
     const left = !sel ? 0 : state.focus ? 0 : narrow ? 0 : stripsW + SIDE;
     const top = sel && narrow && !state.focus ? BAR : 0;
     content.classList.toggle('is-open', !!sel);
+    stage.classList.toggle('is-home', !sel);
     Object.assign(content.style, { left: `${left}px`, top: `${top}px` });
     document.body.classList.toggle('is-focus', !!(sel && state.focus));
     // кнопка «Развернуть / Вернуть книжки» — в шапке, неподвижна
@@ -407,7 +430,7 @@
     state.mid = m ? m.id : null;
     state.pid = m ? (m.menu.find((i) => i.id === pid) || m.menu[0]).id : null;
     if (!m || was !== state.mid) state.focus = false;   // новый раздел — снова с книжками
-    $('hello').textContent = !m ? `Привет, ${String(me.fullName || '').split(/\s+/)[1] || me.nick}!` : '';
+    $('hello').innerHTML = !m ? `Привет, <b>${esc(String(me.fullName || '').split(/\s+/)[1] || me.nick)}</b>!` : '';
     layout();
     render();
   }

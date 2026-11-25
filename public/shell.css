@@ -231,3 +231,49 @@ h1, h2 { font-family: var(--display); font-weight: 600; margin: 0; }
   .page-head h1 { font-size: 22px; }
   .page-head .sub { display: none; }
 }
+
+/* ── Главная по макету владельца (25.11.2026): карточки на тёмной сцене со свечением ── */
+.stage::before { content: ''; position: absolute; inset: 0; z-index: 0; opacity: 0; pointer-events: none; transition: opacity var(--morph) var(--ease);
+  background: radial-gradient(40% 55% at 18% 60%, rgba(20, 137, 79, .38), transparent 70%),
+              radial-gradient(40% 55% at 50% 35%, rgba(51, 70, 196, .42), transparent 70%),
+              radial-gradient(40% 55% at 85% 65%, rgba(226, 113, 29, .36), transparent 70%),
+              linear-gradient(180deg, #121526 0%, #0d0f1a 100%); }
+.stage.is-home::before { opacity: 1; }
+.panel { border-radius: 0; transition: left var(--morph) var(--ease), top var(--morph) var(--ease), width var(--morph) var(--ease), height var(--morph) var(--ease), border-radius var(--morph) var(--ease), box-shadow var(--morph) var(--ease); }
+.panel--col { border-radius: 30px; box-shadow: 0 24px 60px -18px color-mix(in srgb, var(--tint) 75%, transparent), inset 0 0 0 1.5px rgba(255, 255, 255, .28), inset 0 1px 0 rgba(255, 255, 255, .45); }
+/* мягкие волны в карточке */
+.panel::after { content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 0; transition: opacity .4s ease;
+  background: radial-gradient(140% 55% at 110% 72%, rgba(255,255,255,.12) 0 38%, transparent 38.5%),
+              radial-gradient(120% 45% at -20% 96%, rgba(255,255,255,.08) 0 40%, transparent 40.5%); }
+.panel--col::after { opacity: 1; }
+.panel__col { padding: 0 clamp(22px, 2.6vw, 44px) 40px; gap: 14px; }
+.panel__pill { position: absolute; top: 34px; left: clamp(22px, 2.6vw, 44px); display: inline-grid; place-items: center; min-width: 74px; height: 50px; padding: 0 16px;
+  border-radius: 16px; background: rgba(255, 255, 255, .2); box-shadow: inset 0 0 0 1px rgba(255,255,255,.25); font-family: var(--display); font-size: 22px !important; }
+.panel--col .panel__img { top: 12%; width: min(74%, 38vh); }
+.panel--col .panel__title { font-size: clamp(26px, 2.6vw, 40px); font-weight: 800; }
+.panel--col .panel__sub { font-size: clamp(15px, 1.3vw, 19px); font-weight: 500; opacity: .9; white-space: normal; max-width: 30ch; }
+.panel--col .panel__go { height: 56px; padding: 0 30px; border-radius: 999px; font-size: 18px; color: var(--accent-strong); background: linear-gradient(180deg, #fff, #eef3ef); box-shadow: 0 10px 24px -10px rgba(0,0,0,.35); }
+.panel__go--soon { background: rgba(255, 255, 255, .18) !important; color: rgba(255, 255, 255, .85) !important; box-shadow: inset 0 0 0 1px rgba(255,255,255,.22) !important; cursor: default; }
+.panel__go i { display: inline-flex; width: 22px; height: 22px; }
+.panel__go i svg { width: 100%; height: 100%; }
+.panel__col, .panel__strip, .panel__side { z-index: 2; }
+
+/* шапка как в макете */
+.topbar__divider { width: 1px; height: 30px; background: rgba(255,255,255,.18); }
+.hello { color: rgba(255,255,255,.75); font-weight: 500; }
+.hello b { color: #fff; }
+.coins { border: 1px solid rgba(255,255,255,.12); height: 44px; padding: 0 18px; font-size: 15px; }
+.coins__label { opacity: .85; }
+.me { border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.04); padding: 0 14px 0 6px; }
+.me__avatar { color: #fff; font-family: var(--font); font-weight: 600; }
+
+@media (max-width: 900px) {
+  .topbar__divider { display: none; }
+  .panel--col { border-radius: 22px; }
+  .panel__pill { position: static; min-width: 0; height: 30px; padding: 0 10px; font-size: 14px !important; border-radius: 10px; align-self: flex-start; }
+  .panel__col { padding: 14px 130px 14px 18px; justify-content: center; gap: 6px; }
+  .panel--col .panel__img { top: 50%; width: 120px; }
+  .panel--col .panel__title { font-size: 22px; }
+  .panel--col .panel__sub { font-size: 13px; }
+  .panel--col .panel__go { display: none; }
+}
