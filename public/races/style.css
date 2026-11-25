@@ -1,16 +1,16 @@
-/* Тараканьи бега: кухня с побелкой сверху и масляной краской снизу,
+/* Тараканьи бега: кухня с побелкой сверху и изумрудной масляной краской снизу (цвет раздела в «Развитии»),
    эмалированные таблички, жёлтый как старый эмалированный чайник. */
 
 :root {
   --whitewash: #e6e2d6;
-  --wall: #2e5a4c;
-  --wall-deep: #214437;
-  --ink: #16302a;
+  --wall: #11744a;
+  --wall-deep: #0a5232;
+  --ink: #0d2a1d;
   --enamel: #fbfaf5;
   --yolk: #f0b429;
   --brick: #c4402b;
-  --done: #5c8f78;
-  --on-wall: #dce8e1;
+  --done: #4fae80;
+  --on-wall: #dcf3e7;
 
   --font-display: "Unbounded", "Arial Black", system-ui, sans-serif;
   --font-body: "Golos Text", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;

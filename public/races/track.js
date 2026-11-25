@@ -8,9 +8,9 @@
     tileA: '#e4dccb',
     tileB: '#cfc3aa',
     grout: 'rgba(60, 48, 30, 0.10)',
-    gate: '#214437',
+    gate: '#0a5232',
     gateText: '#eef0e6',
-    ink: '#16302a',
+    ink: '#0d2a1d',
     you: 'rgba(240, 180, 41, 0.28)',
     leg: '#2e1c11',
     wing: '#6a3d22',
@@ -492,7 +492,7 @@
       ctx.lineTo(4, by - 13.5);
       ctx.closePath();
       ctx.fill();
-      ctx.fillStyle = c2 === '#f2f0e6' ? '#16302a' : '#fff';
+      ctx.fillStyle = c2 === '#f2f0e6' ? '#0d2a1d' : '#fff';
       ctx.font = '800 8px "Unbounded", "Arial Black", sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
@@ -1630,7 +1630,7 @@
       ctx.setLineDash([]);
 
       // бортик между трибуной и трассой
-      ctx.fillStyle = '#16302a';
+      ctx.fillStyle = '#0d2a1d';
       ctx.fillRect(0, L.standH - 1, W, 5);
       ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
       ctx.fillRect(0, L.standH + 4, W, 1);
@@ -1651,7 +1651,7 @@
       const sq = 7;
       for (let y = L.laneTop, row = 0; y < L.laneTop + lanesH; y += sq, row++) {
         for (let col = 0; col < 2; col++) {
-          ctx.fillStyle = (row + col) % 2 ? '#16302a' : '#fbfaf5';
+          ctx.fillStyle = (row + col) % 2 ? '#0d2a1d' : '#fbfaf5';
           ctx.fillRect(L.finishX + col * sq, y, sq, Math.min(sq, L.laneTop + lanesH - y));
         }
       }
@@ -1853,10 +1853,10 @@
         ctx.fillStyle = '#fbfaf5';
         this.roundRect(ctx, pr.x, pr.y, pr.w, pr.h, 3 * L.crowdScale);
         ctx.fill();
-        ctx.strokeStyle = '#16302a';
+        ctx.strokeStyle = '#0d2a1d';
         ctx.lineWidth = 1.5 * L.crowdScale;
         ctx.stroke();
-        ctx.fillStyle = '#16302a';
+        ctx.fillStyle = '#0d2a1d';
         ctx.font = `800 ${8 * L.crowdScale}px "Unbounded", "Arial Black", sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
