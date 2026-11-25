@@ -52,6 +52,17 @@
     }
   })();
 
+  // Кубки за 1–3 место: золото, серебро, бронза
+  const CUP_COLORS = { 1: ['#ffe38a', '#f3b72a', '#a8700f'], 2: ['#ffffff', '#c9d0d9', '#7d8794'], 3: ['#ffd1a8', '#d98b4e', '#8a4b20'] };
+  const cup = (place) => {
+    const c = CUP_COLORS[place];
+    if (!c) return '';
+    return `<svg class="cup" viewBox="0 0 24 24" aria-label="${place} место"><defs><linearGradient id="cup${place}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c[0]}"/><stop offset=".55" stop-color="${c[1]}"/><stop offset="1" stop-color="${c[2]}"/></linearGradient></defs>`
+      + `<path d="M7 5H4.6a2.6 2.6 0 0 0 2.7 3.6M17 5h2.4a2.6 2.6 0 0 1-2.7 3.6" stroke="${c[2]}" stroke-width="1.7" fill="none" stroke-linecap="round"/>`
+      + `<path d="M6.8 3h10.4v4.2a5.2 5.2 0 0 1-10.4 0z" fill="url(#cup${place})"/><path d="M10.4 12.2h3.2l.7 3.8H9.7z" fill="${c[2]}"/>`
+      + `<rect x="7.3" y="16" width="9.4" height="3.6" rx="1.2" fill="url(#cup${place})"/><path d="M9.6 4.8v2.6" stroke="#fff" stroke-opacity=".7" stroke-width="1.4" stroke-linecap="round"/></svg>`;
+  };
+
   const escapeHtml = (s) =>
     String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -258,7 +269,7 @@
       return;
     }
     ol.innerHTML = list
-      .map((r) => `<li><span class="r-nick">${escapeHtml(r.nick)}</span><span class="r-cpm">${r.cpm} зн/мин</span></li>`)
+      .map((r, i) => `<li><span class="r-cup">${cup(i + 1)}</span><span class="r-nick">${escapeHtml(r.nick)}</span><span class="r-cpm">${r.cpm} зн/мин</span></li>`)
       .join('');
   });
 

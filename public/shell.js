@@ -283,9 +283,10 @@
     content.style.setProperty('--accent', m.accent);
     content.style.setProperty('--accent-strong', m.strong);
     content.style.setProperty('--tint', m.tint);
+    // Приложение во фрейме (заезды) — без заголовков, на всё место справа от меню
+    if (p.frame) { page.innerHTML = ''; return showFrame(m, p); }
     page.innerHTML = header(m, p) + '<div class="page" id="pageBody"><p class="muted">Загрузка…</p></div>';
     const box = $('pageBody');
-    if (p.frame) { box.remove(); return showFrame(m, p); }
     if (m.soon) {
       box.innerHTML = `<section class="block soon"><span class="soon__art" aria-hidden="true">${m.art}</span><h2 class="block__title">Раздел готовится</h2>
         <p>${esc(m.about)}</p><p class="muted">Монетки появятся вместе с первыми тестами и задачами. Пока можно размяться в тараканьих бегах.</p>
@@ -314,6 +315,17 @@
   }
   function hideFrames() { Object.values(frames).forEach((f) => { f.hidden = true; }); content.classList.remove('has-frame'); }
 
+  // Кубки за 1–3 место: золото, серебро, бронза
+  const CUP_COLORS = { 1: ['#ffe38a', '#f3b72a', '#a8700f'], 2: ['#ffffff', '#c9d0d9', '#7d8794'], 3: ['#ffd1a8', '#d98b4e', '#8a4b20'] };
+  const cup = (place) => {
+    const c = CUP_COLORS[place];
+    if (!c) return '';
+    return `<svg class="cup" viewBox="0 0 24 24" aria-label="${place} место"><defs><linearGradient id="cup${place}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c[0]}"/><stop offset=".55" stop-color="${c[1]}"/><stop offset="1" stop-color="${c[2]}"/></linearGradient></defs>`
+      + `<path d="M7 5H4.6a2.6 2.6 0 0 0 2.7 3.6M17 5h2.4a2.6 2.6 0 0 1-2.7 3.6" stroke="${c[2]}" stroke-width="1.7" fill="none" stroke-linecap="round"/>`
+      + `<path d="M6.8 3h10.4v4.2a5.2 5.2 0 0 1-10.4 0z" fill="url(#cup${place})"/><path d="M10.4 12.2h3.2l.7 3.8H9.7z" fill="${c[2]}"/>`
+      + `<rect x="7.3" y="16" width="9.4" height="3.6" rx="1.2" fill="url(#cup${place})"/><path d="M9.6 4.8v2.6" stroke="#fff" stroke-opacity=".7" stroke-width="1.4" stroke-linecap="round"/></svg>`;
+  };
+
   // ---------- Тараканьи бега ----------
   const fmtDate = (s) => new Date(s).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit', hour: '2-digit', minute: '2-digit' });
   const fmtTime = (ms) => (ms ? `${Math.floor(ms / 60000)}:${String(Math.round((ms % 60000) / 1000)).padStart(2, '0')}` : '—');
@@ -334,7 +346,7 @@
     try {
       const list = await api('/api/records');
       box.innerHTML = `<section class="card card--flush"><h2 class="card__title">Самые быстрые</h2>
-        ${list.length ? `<ol class="records">${list.map((r, i) => `<li class="${me && r.nick === me.nick ? 'is-me' : ''}"><span class="records__place">${i + 1}</span><span class="records__nick">${esc(r.nick)}</span><span class="records__cpm"><b>${r.cpm}</b> зн/мин</span><span class="records__acc">${r.acc}%</span></li>`).join('')}</ol>`
+        ${list.length ? `<ol class="records">${list.map((r, i) => `<li class="${me && r.nick === me.nick ? 'is-me' : ''}"><span class="records__place">${cup(i + 1)}${i + 1}</span><span class="records__nick">${esc(r.nick)}</span><span class="records__cpm"><b>${r.cpm}</b> зн/мин</span><span class="records__acc">${r.acc}%</span></li>`).join('')}</ol>`
           : '<p class="empty">Рекордов пока нет — стань первым.</p>'}</section>`;
     } catch (e) { fail(box, e); }
   }

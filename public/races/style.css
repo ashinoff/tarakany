@@ -163,8 +163,8 @@ p { margin: 0; }
 .records li {
   counter-increment: rec;
   display: grid;
-  grid-template-columns: 2.2em 1fr auto;
-  align-items: baseline;
+  grid-template-columns: 2.2em 26px 1fr auto;
+  align-items: center;
   gap: 8px;
   padding: 9px 0;
   border-bottom: 1px solid rgba(220, 232, 225, 0.18);
@@ -178,6 +178,8 @@ p { margin: 0; }
 .records li.empty { display: block; border: 0; color: var(--on-wall); opacity: 0.85; }
 .records li.empty::before { content: none; }
 .r-nick { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.r-cup { display: inline-flex; width: 24px; height: 24px; }
+.r-cup .cup { width: 100%; height: 100%; filter: drop-shadow(0 1px 2px rgba(0, 0, 0, .35)); }
 .r-cpm { font-variant-numeric: tabular-nums; color: #fff; font-weight: 600; }
 
 /* правая колонка входа: список комнат + рекорды */
