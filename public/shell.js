@@ -421,18 +421,46 @@
     page.innerHTML = `<section class="block soon blocked"><span class="soon__icon" aria-hidden="true">${ICONS.sprout}</span><h2 class="block__title">Нужен вход через платформу</h2><p>${esc(message)}</p></section>`;
   }
 
+  // ---------- Смена содержимого в такт с книжками ----------
+  // Раздел → раздел: старое уезжает вправо и гаснет, новое возвращается справа на место;
+  // вместе ровно --morph (620 мс), как перестановка книжек. Пункт меню → пункт: короткое
+  // мягкое появление. Быстрые повторные клики: доигрывается только последний переход.
+  const MORPH = 620;
+  const calm = window.matchMedia('(prefers-reduced-motion: reduce)');
+  let swapSeq = 0;
+  async function swapContent(kind) {
+    const seq = ++swapSeq;
+    if (calm.matches || !content.animate) return render();
+    if (kind === 'module') {
+      const out = content.animate([{ transform: 'translateX(0)', opacity: 1 }, { transform: 'translateX(90px)', opacity: 0 }],
+        { duration: MORPH * 0.4, easing: 'cubic-bezier(.55, 0, 1, .45)', fill: 'forwards' });
+      await out.finished.catch(() => {});
+      if (seq !== swapSeq) return out.cancel();
+      render();
+      out.cancel();
+      content.animate([{ transform: 'translateX(90px)', opacity: 0 }, { transform: 'translateX(0)', opacity: 1 }],
+        { duration: MORPH * 0.6, easing: 'cubic-bezier(0, .55, .45, 1)' });
+    } else {
+      render();
+      page.animate([{ transform: 'translateY(10px)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 260, easing: 'ease-out' });
+    }
+  }
+
   // ---------- Маршрут: #/раздел/страница ----------
   function route() {
     if (!me) return;
     const [, mid, pid] = location.hash.split('/');
     const m = visible().find((x) => x.id === mid);
     const was = state.mid;
+    const wasPage = state.pid;
     state.mid = m ? m.id : null;
     state.pid = m ? (m.menu.find((i) => i.id === pid) || m.menu[0]).id : null;
     if (!m || was !== state.mid) state.focus = false;   // новый раздел — снова с книжками
     $('hello').innerHTML = !m ? `Привет, <b>${esc(String(me.fullName || '').split(/\s+/)[1] || me.nick)}</b>!` : '';
     layout();
-    render();
+    if (was && m && was !== state.mid) swapContent('module');          // книжка → книжка
+    else if (was && m && wasPage !== state.pid) swapContent('page');   // пункт меню внутри раздела
+    else { swapSeq++; render(); }                                      // с главной / на главную — как было
   }
   window.addEventListener('hashchange', route);
   if (new URLSearchParams(location.search).get('room') && !location.hash) location.hash = '#/races/race';
