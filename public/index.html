@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Развитие</title>
   <meta name="description" content="Развитие: тараканьи бега, тестирование и задачи — за успехи падают монетки.">
-  <meta name="theme-color" content="#23272e">
+  <meta name="theme-color" content="#121317">
   <link rel="icon" type="image/svg+xml" href="/logo.svg">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,23 +15,42 @@
 <body>
   <header class="topbar">
     <a class="brand" href="#/" aria-label="Развитие — на главную">
-      <img class="brand__logo" src="/logo.svg" alt="" aria-hidden="true">
+      <!-- живой логотип: росток покачивается, монетка подпрыгивает, искры мерцают -->
+      <svg class="logo" viewBox="0 0 64 64" aria-hidden="true">
+        <defs>
+          <radialGradient id="logoGlow" cx="50%" cy="62%" r="60%">
+            <stop offset="0" stop-color="#3a2d55"/><stop offset=".55" stop-color="#1b1c24"/><stop offset="1" stop-color="#0d0e12"/>
+          </radialGradient>
+          <radialGradient id="coinFill" cx="35%" cy="35%" r="70%">
+            <stop offset="0" stop-color="#fff1b8"/><stop offset=".6" stop-color="#f2b632"/><stop offset="1" stop-color="#a8700f"/>
+          </radialGradient>
+        </defs>
+        <rect width="64" height="64" rx="15" fill="url(#logoGlow)"/>
+        <g class="logo__plant">
+          <path d="M32 54V31" stroke="#f6efe6" stroke-width="3" stroke-linecap="round"/>
+          <path class="logo__leaf logo__leaf--1" d="M32 34c-11 0-17-7-17-17 11 0 17 7 17 17z" fill="#ff9b6b"/>
+          <path class="logo__leaf logo__leaf--2" d="M32 31c0-11 7-17 17-17 0 11-7 17-17 17z" fill="#6fb8ec"/>
+          <path class="logo__leaf logo__leaf--3" d="M32 44c-8 0-13 4-14 10 8 1 13-3 14-10z" fill="#a3d15a"/>
+        </g>
+        <g class="logo__coin"><circle cx="50" cy="46" r="7" fill="url(#coinFill)"/><path d="M50 42.5v7" stroke="#8a5a0b" stroke-width="1.6" stroke-linecap="round"/></g>
+        <path class="logo__spark logo__spark--1" d="M14 46l1.3 2.7L18 50l-2.7 1.3L14 54l-1.3-2.7L10 50l2.7-1.3z" fill="#fff4c9"/>
+        <path class="logo__spark logo__spark--2" d="M47 9l1 2 2 1-2 1-1 2-1-2-2-1 2-1z" fill="#dccbf5"/>
+      </svg>
       <span class="brand__name">Развитие</span>
     </a>
+    <span class="hello" id="hello"></span>
     <span class="topbar__spacer"></span>
-    <span class="coins" id="coins" title="Монетки падают за пройденные тесты и задачи — на них можно играть. Скоро!">
+    <span class="coins" id="coins" title="Монетки падают за пройденные тесты и задачи — на них можно играть.">
       <span class="coins__icon" aria-hidden="true"></span><b id="coinsValue">0</b><span class="coins__label">монеток</span>
     </span>
     <span class="me" id="me"><span class="me__avatar" id="meAvatar"></span><span class="me__name" id="meName">…</span></span>
   </header>
 
-  <div class="layout" id="layout">
-    <nav class="strips" id="strips" aria-label="Разделы"></nav>
-    <aside class="menu" id="menu" hidden></aside>
-    <div class="main">
-      <main class="content" id="content"></main>
+  <div class="stage" id="stage">
+    <main class="content" id="content">
+      <div class="content__page" id="page"></div>
       <div class="frames" id="frames"></div>
-    </div>
+    </main>
   </div>
 
   <script src="shell.js"></script>

@@ -50,18 +50,44 @@ app.get('/health', (req, res) => res.send('ok'));
 app.get('/api/records', (req, res) => res.json(topRecords()));
 
 // Пользователь платформы по токену (заголовок Authorization: Bearer …)
-const authed = (fn) => async (req, res) => {
+const authed = (fn, { admin = false } = {}) => async (req, res) => {
   try {
     const user = await store.user(await identify(req.get('authorization')));
+    if (admin && !user.isAdmin) return res.status(403).json({ error: 'Это раздел администратора «Развития».' });
     res.json(await fn(user, req));
   } catch (e) {
     if (e instanceof AuthError) return res.status(401).json({ error: e.message });
+    if (e.status) return res.status(e.status).json({ error: e.message });
     console.error(e);
     res.status(500).json({ error: 'Ошибка сервера. Попробуй ещё раз.' });
   }
 };
 app.get('/api/me', authed(async (user) => ({ ...user, storage: store.kind, devAuth: AUTH_DISABLED })));
 app.get('/api/races/mine', authed((user) => store.myResults(user.id)));
+
+// ---------- Админка ----------
+const bad = (message) => Object.assign(new Error(message), { status: 400 });
+const intId = (v) => { const n = Number(v); if (!Number.isInteger(n) || n <= 0) throw bad('Неверный номер.'); return n; };
+app.get('/api/admin/users', authed(() => store.adminUsers(), { admin: true }));
+app.post('/api/admin/users/:id', express.json({ limit: '20kb' }), authed(async (user, req) => {
+  const id = intId(req.params.id);
+  const b = req.body || {};
+  const coinsDelta = b.coinsDelta === undefined ? 0 : Math.trunc(Number(b.coinsDelta));
+  if (!Number.isFinite(coinsDelta) || Math.abs(coinsDelta) > 100000) throw bad('Монеток — целое число до 100 000.');
+  const reason = String(b.reason || '').trim().slice(0, 200);
+  if (coinsDelta && !reason) throw bad('Укажи, за что начисляешь или списываешь монетки.');
+  if (b.isAdmin !== undefined && typeof b.isAdmin !== 'boolean') throw bad('Неверный признак администратора.');
+  if (b.isAdmin === false && id === user.id) throw bad('Снять права администратора с себя нельзя.');
+  await store.adminUpdateUser(id, { coinsDelta, reason, isAdmin: b.isAdmin }, user.id);
+  return { ok: true };
+}, { admin: true }));
+app.get('/api/admin/coins', authed(() => store.adminCoinLog(), { admin: true }));
+app.get('/api/admin/races', authed(() => store.adminRaces(), { admin: true }));
+app.delete('/api/admin/races/:id', authed(async (_user, req) => {
+  await store.adminDeleteRace(intId(req.params.id));
+  io.emit('records', await refreshRecords());
+  return { ok: true };
+}, { admin: true }));
 
 const server = http.createServer(app);
 const io = new Server(server, {
